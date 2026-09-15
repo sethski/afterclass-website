@@ -1,0 +1,49 @@
+---
+description: Company strategy is outside GitHub; ask the user for docs before inventing copy
+alwaysApply: false
+---
+# Company context routing
+
+This GitHub repo is **the public website only**. Internal company documents do not belong here.
+
+## Git boundary (non-negotiable)
+
+- **`company/` is gitignored.** It may exist on a maintainer's machine for local reference. It is **not** on GitHub and must **never** be committed, staged, or pushed from this repo.
+- Do not add strategy docs, runbooks, funding materials, internal hackathon plans, or ops logs to this repository.
+- Public copy that ships on the site belongs in **`lib/content.ts`** or **`lib/*-content.ts`**, not in a `company/` folder in git.
+
+If you see `company/` locally, treat it as out of scope for git operations. Do not `git add company/`.
+
+## When strategy or company context is needed
+
+For company information, the hackathon, the collective, brand, vision, partnerships, planning, or program details:
+
+1. **Ask the user** for the relevant document, excerpt, or link (Notion, paste, attachment). Do not assume files exist in the repo.
+2. Use **`lib/content.ts`** and existing site copy as the in-repo source of truth for what is already public.
+3. Only after the user provides context, implement or draft **public-facing** site copy in `lib/`.
+
+Do not invent positioning, event details, or program facts when the user has not supplied source material.
+
+## Site vs company work
+
+| Task | Where it lives |
+| --- | --- |
+| Website routes, components, styles | This repo (`app/`, `components/`, `lib/`) |
+| Public marketing copy on the site | `lib/content.ts`, `lib/*-content.ts` |
+| Internal strategy, ops, funding, programs | Outside git (user-provided; often local `company/` or Notion) |
+
+Unless the user explicitly asks to implement site changes, treat strategy questions as requests to **review or draft from supplied docs**, not to search the repo.
+
+## Hackathon language boundary (public site)
+
+**Public event name:** Build the NextDecade  
+**Internal codename:** Sandbox 01 (team docs only, never on the public site)
+
+Never use "sandbox" in website copy, forms, or public-facing materials. Ask the user for approved public wording if unsure.
+
+## Strategic posture (when user provides docs)
+
+- Preserve company language and intent before inventing new framing.
+- Distill internal material into clean public copy in `lib/`, not into new repo folders.
+- Think in terms of public narrative, builder experience, and what must ship on the site.
+- If supplied docs conflict, call out the conflict and ask which source wins.

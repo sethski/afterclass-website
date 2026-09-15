@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-label="After Class">
+  <!-- Symmetrical pin-wing butterfly: salmon fill, cream outline + spots -->
+  <path
+    d="M64 56
+       C58 22 28 14 18 28
+       C10 40 18 58 42 66
+       C50 69 58 66 64 56Z"
+    fill="#F39394"
+    stroke="#FEF9E6"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M64 56
+       C70 22 100 14 110 28
+       C118 40 110 58 86 66
+       C78 69 70 66 64 56Z"
+    fill="#F39394"
+    stroke="#FEF9E6"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M64 62
+       C50 78 30 96 28 106
+       C26 116 44 118 56 100
+       C60 92 62 78 64 62Z"
+    fill="#F39394"
+    stroke="#FEF9E6"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M64 62
+       C78 78 98 96 100 106
+       C102 116 84 118 72 100
+       C68 92 66 78 64 62Z"
+    fill="#F39394"
+    stroke="#FEF9E6"
+    stroke-width="6"
+    stroke-linejoin="round"
+  />
+  <circle cx="38" cy="40" r="8" fill="#FEF9E6"/>
+  <circle cx="90" cy="40" r="8" fill="#FEF9E6"/>
+  <circle cx="44" cy="92" r="5.5" fill="#FEF9E6"/>
+  <circle cx="84" cy="92" r="5.5" fill="#FEF9E6"/>
+</svg>
