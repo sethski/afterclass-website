@@ -109,19 +109,72 @@ body {
   }
 }
 
+/* TestRun Typeform stub - black/white only; recolor later via these vars */
 .test-run {
-  background: var(--color-cream);
-  color: var(--color-charcoal);
-  caret-color: var(--color-primary-maroon);
-  scrollbar-color: var(--color-dusty-rose) var(--color-cream);
+  --q-bg: #ffffff;
+  --q-text: #000000;
+  --q-muted: #5c5c5c;
+  --q-line: #000000;
+  --q-track: #e5e5e5;
+  --q-fill: #000000;
+  --q-ok-bg: #000000;
+  --q-ok-text: #ffffff;
+  --q-choice-bg: rgb(0 0 0 / 0.05);
+  --q-choice-bg-hover: rgb(0 0 0 / 0.08);
+  --q-choice-selected: rgb(0 0 0 / 0.12);
+  --q-error: #000000;
+  --q-progress-h: 4px;
+  --q-ok-h: 44px;
+  --q-ok-radius: 4px;
+  --q-badge: 32px;
+  --q-badge-radius: 4px;
+  --q-col-max: 44rem;
+  --q-chevron: 36px;
+  --q-footer-inset: 24px;
+  --q-title: clamp(1.75rem, 3.2vw, 2.25rem);
+  --q-body: 1.125rem;
+  --q-key: 28px;
+
+  background: var(--q-bg);
+  color: var(--q-text);
+  caret-color: var(--q-text);
+  scrollbar-color: var(--q-muted) var(--q-bg);
 }
 
 .test-run ::selection {
-  background: var(--color-primary-salmon);
-  color: var(--color-primary-maroon);
+  background: var(--q-text);
+  color: var(--q-bg);
 }
 
 .test-run :focus-visible {
-  outline: 2px solid var(--color-primary-salmon);
+  outline: 2px solid var(--q-text);
   outline-offset: 3px;
+}
+
+.test-run input:focus-visible,
+.test-run textarea:focus-visible,
+.test-run select:focus-visible {
+  outline: none;
+}
+
+.test-run input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='button']):not([type='submit']),
+.test-run textarea,
+.test-run select {
+  border-color: var(--q-track) !important;
+}
+
+.test-run input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='button']):not([type='submit']):focus,
+.test-run input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='button']):not([type='submit']):focus-visible,
+.test-run textarea:focus,
+.test-run textarea:focus-visible,
+.test-run select:focus,
+.test-run select:focus-visible {
+  border-color: var(--q-track) !important;
+  outline: none;
+}
+
+.test-run input[aria-invalid='true'],
+.test-run textarea[aria-invalid='true'],
+.test-run select[aria-invalid='true'] {
+  border-color: var(--q-error) !important;
 }

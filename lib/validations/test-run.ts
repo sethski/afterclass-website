@@ -1,5 +1,10 @@
 import { z } from 'zod'
 import { testRunContent } from '@/lib/test-run-content'
+import {
+  scheduleSlotsValid,
+  serializeScheduleSlots,
+  type ScheduleSlot,
+} from '@/lib/test-run-schedule'
 
 const PERSONAL_INBOX_DOMAINS = new Set([
   'gmail.com',
@@ -41,8 +46,8 @@ export const testRunPayloadSchema = z
   .object({
     consent: z.literal(true, { error: 'Consent is required to continue.' }),
     wantIn: z.literal('yes', { error: 'Only continue if yes.' }),
-    campus: nonEmpty('Enter your campus or school.'),
-    cityCorridor: nonEmpty('Choose a city corridor.'),
+    campus: nonEmpty('Enter your school.'),
+    cityCorridor: nonEmpty('Choose a city.'),
     cityCorridorOther: z.string().trim().optional().default(''),
     fullName: nonEmpty('Enter your full name.'),
     age: z.coerce
@@ -51,39 +56,50 @@ export const testRunPayloadSchema = z
       .min(18, 'Early testing is 18+ only.')
       .max(99, 'Enter a real age.'),
     email: z.email('Enter a valid email address'),
-    phone: nonEmpty('Enter a phone or WhatsApp number.'),
-    socials: z.string().trim().optional().default(''),
-    contactPreference: z.enum(testRunContent.contactOptions, {
-      error: 'Choose a contact preference.',
-    }),
-    isMe: z.literal(true, { error: 'Confirm you’ll show up as yourself.' }),
+    phone: z.string().trim().optional().default(''),
+    socials: nonEmpty('Enter your Instagram handle.'),
+    contactPreference: z
+      .enum(testRunContent.contactOptions)
+      .optional()
+      .default('Instagram'),
+    isMe: z.literal(true).optional().default(true),
     gender: z.enum(testRunContent.genderOptions, {
       error: 'Choose a gender option.',
     }),
     genderOther: z.string().trim().optional().default(''),
-    meetGenders: z
-      .array(z.enum(testRunContent.meetOptions))
-      .min(1, 'Choose who you want to meet.'),
+    meetGenders: z.array(z.string().trim().min(1)).min(1, 'Choose who you want to meet.'),
+    meetOther: z.string().trim().optional().default(''),
     school: nonEmpty('Enter your school.'),
     yearLevel: z.enum(testRunContent.yearOptions, {
       error: 'Choose your year level.',
     }),
-    departureArea: nonEmpty('Enter an area, campus, or landmark.'),
+    departureArea: z.string().trim().optional().default(''),
     maxTravel: z.enum(testRunContent.travelOptions, {
       error: 'Choose a max travel time.',
     }),
-    nearbySchoolOk: z.enum(['yes', 'no'], {
-      error: 'Tell us if a nearby school is okay.',
-    }),
-    dealbreakers: nonEmpty('Add 3–5 short dealbreakers.'),
+    nearbySchoolOk: z.enum(['yes', 'no']).optional().default('yes'),
+    dealbreakers: z
+      .string()
+      .trim()
+      .min(1, 'Add 3 short dealbreakers.')
+      .refine(
+        (value) => {
+          const count = value
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean).length
+          return count === 3
+        },
+        { error: 'Add 3 short dealbreakers.' }
+      ),
     aboutYou: nonEmpty('Add one line about you or a good first date.'),
     preferredCafes: z.string().trim().optional().default(''),
     refuseAreas: z.string().trim().optional().default(''),
     coverOwnOrder: z.enum(['yes', 'no'], {
-      error: 'Tell us if you can cover your own order.',
+      error: 'Pick I agree or I disagree.',
     }),
     accessibility: z.string().trim().optional().default(''),
-    schedule: nonEmpty('Tell us days and times you can do a daytime cafe date.'),
+    schedule: nonEmpty('Pick at least one day and time window.'),
     hardNos: z.string().trim().optional().default(''),
     understandEarly: z.literal(true, {
       error: 'Confirm you understand this is early testing.',
@@ -114,14 +130,21 @@ export const testRunPayloadSchema = z
       ctx.addIssue({
         code: 'custom',
         path: ['cityCorridorOther'],
-        message: 'Enter your city or corridor.',
+        message: 'Enter your city.',
       })
     }
-    if (value.gender === 'Self-describe' && !value.genderOther) {
+    if (value.gender === 'Other' && !value.genderOther) {
       ctx.addIssue({
         code: 'custom',
         path: ['genderOther'],
-        message: 'Tell us how you describe it.',
+        message: 'Tell us how you identify.',
+      })
+    }
+    if (value.meetGenders.includes('Other') && !value.meetOther) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['meetOther'],
+        message: 'Tell us who else you want to meet.',
       })
     }
   })
@@ -146,18 +169,19 @@ export type TestRunFormState = {
   gender: '' | (typeof testRunContent.genderOptions)[number]
   genderOther: string
   meetGenders: Array<(typeof testRunContent.meetOptions)[number]>
+  meetOther: string
   school: string
   yearLevel: string
   departureArea: string
   maxTravel: string
   nearbySchoolOk: '' | 'yes' | 'no'
-  dealbreakers: string
+  dealbreakers: string[]
   aboutYou: string
   preferredCafes: string
   refuseAreas: string
   coverOwnOrder: '' | 'yes' | 'no'
   accessibility: string
-  schedule: string
+  scheduleSlots: ScheduleSlot[]
   hardNos: string
   understandEarly: boolean
   publicCafe: boolean
@@ -187,25 +211,26 @@ export function emptyTestRunState(
     email,
     phone: '',
     socials: '',
-    contactPreference: '',
+    contactPreference: 'Instagram',
     facePhoto: null,
     schoolIdPhoto: null,
-    isMe: false,
+    isMe: true,
     gender: '',
     genderOther: '',
     meetGenders: [],
+    meetOther: '',
     school: '',
     yearLevel: '',
     departureArea: '',
     maxTravel: '',
-    nearbySchoolOk: '',
-    dealbreakers: '',
+    nearbySchoolOk: 'yes',
+    dealbreakers: [''],
     aboutYou: '',
     preferredCafes: '',
     refuseAreas: '',
     coverOwnOrder: '',
     accessibility: '',
-    schedule: '',
+    scheduleSlots: [],
     hardNos: '',
     understandEarly: false,
     publicCafe: false,
@@ -221,18 +246,40 @@ export function emptyTestRunState(
   }
 }
 
+function isAllowedImageType(file: File): boolean {
+  const type = file.type.toLowerCase()
+  if ((TEST_RUN_ALLOWED_MIME as readonly string[]).includes(type)) return true
+  // iPhone photos often arrive with an empty MIME type
+  const name = file.name.toLowerCase()
+  return (
+    name.endsWith('.heic') ||
+    name.endsWith('.heif') ||
+    name.endsWith('.jpg') ||
+    name.endsWith('.jpeg') ||
+    name.endsWith('.png') ||
+    name.endsWith('.webp')
+  )
+}
+
 export function isAllowedTestRunFile(file: File | null): file is File {
   if (!file || file.size === 0) return false
   if (file.size > TEST_RUN_MAX_FILE_BYTES) return false
-  const type = file.type.toLowerCase()
-  return (TEST_RUN_ALLOWED_MIME as readonly string[]).includes(type)
+  return isAllowedImageType(file)
+}
+
+export function filledDealbreakers(items: string[]): string[] {
+  return items.map((item) => item.trim()).filter(Boolean)
+}
+
+export function serializeDealbreakers(items: string[]): string {
+  return filledDealbreakers(items).join('\n')
 }
 
 export function fileError(file: File | null): string | undefined {
   if (!file || file.size === 0) return 'Add a photo.'
   if (file.size > TEST_RUN_MAX_FILE_BYTES) return 'Keep it under 5 MB.'
-  if (!(TEST_RUN_ALLOWED_MIME as readonly string[]).includes(file.type.toLowerCase())) {
-    return 'Use JPG, PNG, or WEBP.'
+  if (!isAllowedImageType(file)) {
+    return 'Use JPG, PNG, WEBP, or HEIC.'
   }
   return undefined
 }
@@ -258,15 +305,14 @@ export function validateTestRunPage(
   if (page === 1) {
     requireChecked(state.consent, 'consent', p[1].consentHelper, errors)
     if (state.wantIn !== 'yes' && state.wantIn !== 'no') {
-      errors.wantIn = p[1].wantInHelper
+      errors.wantIn = p[1].wantInError
     }
   }
 
   if (page === 2) {
-    if (!state.campus.trim()) errors.campus = 'Enter your campus or school.'
-    if (!state.cityCorridor) errors.cityCorridor = 'Choose a city corridor.'
+    if (!state.cityCorridor) errors.cityCorridor = 'Choose a city.'
     if (state.cityCorridor === 'Other' && !state.cityCorridorOther.trim()) {
-      errors.cityCorridorOther = 'Enter your city or corridor.'
+      errors.cityCorridorOther = 'Enter your city.'
     }
   }
 
@@ -285,51 +331,43 @@ export function validateTestRunPage(
       const parsed = z.email().safeParse(state.email.trim())
       if (!parsed.success) errors.email = 'Enter a valid email address.'
     }
-    if (!state.phone.trim()) errors.phone = 'Enter a phone or WhatsApp number.'
-    if (!state.contactPreference) {
-      errors.contactPreference = 'Choose a contact preference.'
-    }
+    if (!state.socials.trim()) errors.socials = 'Enter your Instagram handle.'
   }
 
   if (page === 4) {
     const face = fileError(state.facePhoto)
-    const id = fileError(state.schoolIdPhoto)
     if (face) errors.facePhoto = face
-    if (id) errors.schoolIdPhoto = id
-    requireChecked(state.isMe, 'isMe', 'Confirm you’ll show up as yourself.', errors)
   }
 
   if (page === 5) {
     if (!state.gender) errors.gender = 'Choose a gender option.'
-    if (state.gender === 'Self-describe' && !state.genderOther.trim()) {
-      errors.genderOther = 'Tell us how you describe it.'
+    if (state.gender === 'Other' && !state.genderOther.trim()) {
+      errors.genderOther = 'Tell us how you identify.'
     }
     if (state.meetGenders.length === 0) {
       errors.meetGenders = 'Choose who you want to meet.'
     }
+    if (state.meetGenders.includes('Other') && !state.meetOther.trim()) {
+      errors.meetOther = 'Tell us who else you want to meet.'
+    }
     if (!state.school.trim()) errors.school = 'Enter your school.'
     if (!state.yearLevel) errors.yearLevel = 'Choose your year level.'
-    if (!state.departureArea.trim()) {
-      errors.departureArea = 'Enter an area, campus, or landmark.'
-    }
     if (!state.maxTravel) errors.maxTravel = 'Choose a max travel time.'
-    if (state.nearbySchoolOk !== 'yes' && state.nearbySchoolOk !== 'no') {
-      errors.nearbySchoolOk = 'Tell us if a nearby school is okay.'
-    }
-    if (!state.dealbreakers.trim()) {
-      errors.dealbreakers = 'Add 3–5 short dealbreakers.'
+    const dealCount = filledDealbreakers(state.dealbreakers).length
+    if (dealCount !== 3) {
+      errors.dealbreakers = 'Add 3 short dealbreakers.'
     }
     if (!state.aboutYou.trim()) {
       errors.aboutYou = 'Add one line about you or a good first date.'
     }
     if (state.coverOwnOrder !== 'yes' && state.coverOwnOrder !== 'no') {
-      errors.coverOwnOrder = p[5].coverHelper
+      errors.coverOwnOrder = p[5].coverError
     }
   }
 
   if (page === 6) {
-    if (!state.schedule.trim()) {
-      errors.schedule = 'Tell us days and times that work.'
+    if (!scheduleSlotsValid(state.scheduleSlots)) {
+      errors.scheduleSlots = 'Pick at least one day and a 2–3 hour window.'
     }
   }
 
@@ -385,7 +423,7 @@ export function toTestRunPayload(state: TestRunFormState): unknown {
   return {
     consent: state.consent || undefined,
     wantIn: state.wantIn === 'yes' ? 'yes' : undefined,
-    campus: state.campus,
+    campus: state.campus.trim() || state.school,
     cityCorridor: state.cityCorridor,
     cityCorridorOther: state.cityCorridorOther,
     fullName: state.fullName,
@@ -393,23 +431,30 @@ export function toTestRunPayload(state: TestRunFormState): unknown {
     email: state.email,
     phone: state.phone,
     socials: state.socials,
-    contactPreference: state.contactPreference || undefined,
-    isMe: state.isMe || undefined,
+    contactPreference: state.contactPreference || 'Instagram',
+    isMe: true,
     gender: state.gender || undefined,
     genderOther: state.genderOther,
-    meetGenders: state.meetGenders,
-    school: state.school,
+    meetGenders: state.meetGenders.includes('Other')
+      ? [
+          ...state.meetGenders.filter((item) => item !== 'Other'),
+          ...(state.meetOther.trim()
+            ? [`Other: ${state.meetOther.trim()}`]
+            : ['Other']),
+        ]
+      : state.meetGenders,
+    school: state.school.trim() || state.campus,
     yearLevel: state.yearLevel || undefined,
-    departureArea: state.departureArea,
+    departureArea: state.departureArea.trim() || state.school.trim() || state.campus,
     maxTravel: state.maxTravel || undefined,
-    nearbySchoolOk: state.nearbySchoolOk || undefined,
-    dealbreakers: state.dealbreakers,
+    nearbySchoolOk: state.nearbySchoolOk || 'yes',
+    dealbreakers: serializeDealbreakers(state.dealbreakers),
     aboutYou: state.aboutYou,
     preferredCafes: state.preferredCafes,
     refuseAreas: state.refuseAreas,
-    coverOwnOrder: state.coverOwnOrder || undefined,
+    coverOwnOrder: state.coverOwnOrder === 'yes' ? 'yes' : undefined,
     accessibility: state.accessibility,
-    schedule: state.schedule,
+    schedule: serializeScheduleSlots(state.scheduleSlots),
     hardNos: state.hardNos,
     understandEarly: state.understandEarly || undefined,
     publicCafe: state.publicCafe || undefined,

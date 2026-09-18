@@ -38,6 +38,11 @@ function fileExtension(file: File): string {
   if (type === 'image/webp') return 'webp'
   if (type === 'image/heic') return 'heic'
   if (type === 'image/heif') return 'heif'
+  const name = file.name.toLowerCase()
+  if (name.endsWith('.png')) return 'png'
+  if (name.endsWith('.webp')) return 'webp'
+  if (name.endsWith('.heic')) return 'heic'
+  if (name.endsWith('.heif')) return 'heif'
   return 'jpg'
 }
 
@@ -128,12 +133,12 @@ export async function submitTestRun(
   }
 
   const face = asFile(formData.get('facePhoto'))
-  const schoolId = asFile(formData.get('schoolIdPhoto'))
+  const schoolId = asFile(formData.get('schoolIdPhoto')) ?? face
   if (!isAllowedTestRunFile(face) || !isAllowedTestRunFile(schoolId)) {
     return {
       ok: false,
       code: 'invalid',
-      message: 'Add a clear face photo and school ID photo (JPG, PNG, or WEBP, 5 MB max).',
+      message: 'Add a selfie with your school ID (JPG, PNG, or WEBP, 5 MB max).',
     }
   }
 
@@ -203,16 +208,16 @@ export async function submitTestRun(
       email: data.email,
       phone: data.phone,
       socials: data.socials || null,
-      contact_preference: data.contactPreference,
-      is_me: data.isMe,
+      contact_preference: data.contactPreference || 'Instagram',
+      is_me: data.isMe ?? true,
       gender: data.gender,
       gender_other: data.genderOther || null,
       meet_genders: data.meetGenders,
       school: data.school,
       year_level: data.yearLevel,
-      departure_area: data.departureArea,
+      departure_area: data.departureArea || data.school,
       max_travel: data.maxTravel,
-      nearby_school_ok: data.nearbySchoolOk === 'yes',
+      nearby_school_ok: (data.nearbySchoolOk || 'yes') === 'yes',
       dealbreakers: data.dealbreakers,
       about_you: data.aboutYou,
       preferred_cafes: data.preferredCafes || null,

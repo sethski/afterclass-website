@@ -32,8 +32,8 @@ describe('validateTestRunPage', () => {
     state.fullName = 'Ada Reyes'
     state.age = '17'
     state.email = 'ada@ateneo.edu'
-    state.phone = '09171234567'
-    state.contactPreference = 'WhatsApp'
+    state.socials = '@ada.reyes'
+    state.contactPreference = 'Instagram'
     expect(validateTestRunPage(3, state).age).toMatch(/18/)
   })
 })
@@ -59,25 +59,26 @@ function completeState() {
   })
   state.consent = true
   state.wantIn = 'yes'
-  state.campus = 'Ateneo de Manila'
   state.cityCorridor = 'Quezon City'
   state.fullName = 'Ada Reyes'
   state.age = '20'
   state.email = 'ada@ateneo.edu'
-  state.phone = '09171234567'
-  state.contactPreference = 'Either'
+  state.socials = '@ada.reyes'
+  state.contactPreference = 'Instagram'
   state.isMe = true
   state.gender = 'Woman'
   state.meetGenders = ['Men']
   state.school = 'Ateneo de Manila'
   state.yearLevel = '2nd year'
-  state.departureArea = 'Katipunan'
   state.maxTravel = '30 minutes'
   state.nearbySchoolOk = 'yes'
-  state.dealbreakers = 'Smoking. Late by a lot. No plan.'
+  state.dealbreakers = ['Smoking', 'Late by a lot', 'No plan']
   state.aboutYou = 'Walk first, then coffee. I show up on time.'
   state.coverOwnOrder = 'yes'
-  state.schedule = 'Tue/Thu after 1pm. Sat late morning.'
+  state.scheduleSlots = [
+    { date: '2026-09-22', startHour: 13, duration: 2 },
+    { date: '2026-09-24', startHour: 14, duration: 3 },
+  ]
   state.understandEarly = true
   state.publicCafe = true
   state.cancelEarly = true
