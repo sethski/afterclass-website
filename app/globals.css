@@ -2,7 +2,7 @@
 
 :root {
   /* Brand palette (exact hex from style guide) */
-  --color-primary-maroon: #4a1525;
+  --color-primary-maroon: #441925;
   --color-primary-salmon: #f39394;
   --color-cream: #fef9e6;
   --color-charcoal: #2e2e2e;
@@ -109,29 +109,32 @@ body {
   }
 }
 
-/* TestRun Typeform stub - black/white only; recolor later via these vars */
+/* TestRun — brand primary on white */
 .test-run {
   --q-bg: #ffffff;
-  --q-text: #000000;
+  --q-text: var(--color-primary-maroon);
+  --q-ink: #6b6b6b;
+  --q-accent: var(--color-primary-maroon);
   --q-muted: #5c5c5c;
-  --q-line: #000000;
+  --q-line: var(--color-primary-maroon);
   --q-track: #e5e5e5;
-  --q-fill: #000000;
-  --q-ok-bg: #000000;
+  --q-fill: var(--color-primary-maroon);
+  --q-ok-bg: var(--color-primary-maroon);
   --q-ok-text: #ffffff;
-  --q-choice-bg: rgb(0 0 0 / 0.05);
-  --q-choice-bg-hover: rgb(0 0 0 / 0.08);
-  --q-choice-selected: rgb(0 0 0 / 0.12);
-  --q-error: #000000;
+  --q-choice-bg: rgb(68 25 37 / 0.05);
+  --q-choice-bg-hover: rgb(68 25 37 / 0.08);
+  --q-choice-selected: rgb(68 25 37 / 0.12);
+  --q-error: var(--color-primary-maroon);
   --q-progress-h: 4px;
   --q-ok-h: 44px;
   --q-ok-radius: 4px;
   --q-badge: 32px;
   --q-badge-radius: 4px;
-  --q-col-max: 44rem;
+  --q-col-max: 50rem;
   --q-chevron: 36px;
   --q-footer-inset: 24px;
-  --q-title: clamp(1.75rem, 3.2vw, 2.25rem);
+  --q-image-peek: clamp(4.5rem, 14vw, 8.5rem);
+  --q-title: clamp(1.625rem, 2.8vw, 2rem);
   --q-body: 1.125rem;
   --q-key: 28px;
 

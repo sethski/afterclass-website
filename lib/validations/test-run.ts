@@ -70,9 +70,7 @@ export const testRunPayloadSchema = z
     meetGenders: z.array(z.string().trim().min(1)).min(1, 'Choose who you want to meet.'),
     meetOther: z.string().trim().optional().default(''),
     school: nonEmpty('Enter your school.'),
-    yearLevel: z.enum(testRunContent.yearOptions, {
-      error: 'Choose your year level.',
-    }),
+    yearLevel: z.string().trim().min(1, 'Choose your year level.').optional(),
     departureArea: z.string().trim().optional().default(''),
     maxTravel: z.enum(testRunContent.travelOptions, {
       error: 'Choose a max travel time.',
@@ -101,27 +99,21 @@ export const testRunPayloadSchema = z
     accessibility: z.string().trim().optional().default(''),
     schedule: nonEmpty('Pick at least one day and time window.'),
     hardNos: z.string().trim().optional().default(''),
-    understandEarly: z.literal(true, {
-      error: 'Confirm you understand this is early testing.',
-    }),
-    publicCafe: z.literal(true, {
-      error: 'Confirm public daytime cafe only.',
-    }),
+    understandEarly: z.boolean().optional().default(true),
+    publicCafe: z.boolean().optional().default(true),
     cancelEarly: z.literal(true, {
-      error: 'Confirm you’ll cancel early if you can’t make it.',
+      error: testRunContent.pages[7].cancelEarlyError,
     }),
-    canReport: z.literal(true, {
-      error: 'Confirm you can report or leave anytime.',
+    canReport: z.boolean().optional().default(true),
+    interviewOk: z.literal(true, {
+      error: testRunContent.pages[7].interviewError,
     }),
-    interviewOk: z.boolean(),
     emergencyName: z.string().trim().optional().default(''),
     emergencyPhone: z.string().trim().optional().default(''),
     understandData: z.literal(true, {
       error: 'Confirm you understand how your data will be used.',
     }),
-    everythingTrue: z.literal(true, {
-      error: 'Confirm everything here is true.',
-    }),
+    everythingTrue: z.boolean().optional().default(true),
     howHeard: z.string().trim().optional().default(''),
     prefillEmail: z.string().trim().optional().default(''),
   })
@@ -172,6 +164,7 @@ export type TestRunFormState = {
   meetOther: string
   school: string
   yearLevel: string
+  yearLevelOther: string
   departureArea: string
   maxTravel: string
   nearbySchoolOk: '' | 'yes' | 'no'
@@ -185,9 +178,9 @@ export type TestRunFormState = {
   hardNos: string
   understandEarly: boolean
   publicCafe: boolean
-  cancelEarly: boolean
+  cancelEarly: '' | 'yes' | 'no'
   canReport: boolean
-  interviewOk: boolean
+  interviewOk: boolean | null
   emergencyName: string
   emergencyPhone: string
   understandData: boolean
@@ -221,6 +214,7 @@ export function emptyTestRunState(
     meetOther: '',
     school: '',
     yearLevel: '',
+    yearLevelOther: '',
     departureArea: '',
     maxTravel: '',
     nearbySchoolOk: 'yes',
@@ -232,15 +226,15 @@ export function emptyTestRunState(
     accessibility: '',
     scheduleSlots: [],
     hardNos: '',
-    understandEarly: false,
-    publicCafe: false,
-    cancelEarly: false,
-    canReport: false,
-    interviewOk: false,
+    understandEarly: true,
+    publicCafe: true,
+    cancelEarly: '',
+    canReport: true,
+    interviewOk: null,
     emergencyName: '',
     emergencyPhone: '',
     understandData: false,
-    everythingTrue: false,
+    everythingTrue: true,
     howHeard: prefill?.howHeard?.trim() ?? '',
     prefillEmail: email,
   }
@@ -303,7 +297,7 @@ export function validateTestRunPage(
   const p = testRunContent.pages
 
   if (page === 1) {
-    requireChecked(state.consent, 'consent', p[1].consentHelper, errors)
+    requireChecked(state.consent, 'consent', p[1].consentError, errors)
     if (state.wantIn !== 'yes' && state.wantIn !== 'no') {
       errors.wantIn = p[1].wantInError
     }
@@ -350,8 +344,13 @@ export function validateTestRunPage(
     if (state.meetGenders.includes('Other') && !state.meetOther.trim()) {
       errors.meetOther = 'Tell us who else you want to meet.'
     }
-    if (!state.school.trim()) errors.school = 'Enter your school.'
+    if (!state.school.trim() || state.school === 'Other') {
+      errors.school = 'Choose your school.'
+    }
     if (!state.yearLevel) errors.yearLevel = 'Choose your year level.'
+    if (state.yearLevel === 'Others' && !state.yearLevelOther.trim()) {
+      errors.yearLevelOther = 'Tell us your year level.'
+    }
     if (!state.maxTravel) errors.maxTravel = 'Choose a max travel time.'
     const dealCount = filledDealbreakers(state.dealbreakers).length
     if (dealCount !== 3) {
@@ -372,48 +371,19 @@ export function validateTestRunPage(
   }
 
   if (page === 7) {
+    if (state.cancelEarly !== 'yes') {
+      errors.cancelEarly = p[7].cancelEarlyError
+    }
     requireChecked(
-      state.understandEarly,
-      'understandEarly',
-      'Confirm you understand this is early testing.',
-      errors
-    )
-    requireChecked(
-      state.publicCafe,
-      'publicCafe',
-      'Confirm public daytime cafe only.',
-      errors
-    )
-    requireChecked(
-      state.cancelEarly,
-      'cancelEarly',
-      'Confirm you’ll cancel early if you can’t make it.',
-      errors
-    )
-    requireChecked(
-      state.canReport,
-      'canReport',
-      'Confirm you can report or leave anytime.',
+      state.interviewOk === true,
+      'interviewOk',
+      p[7].interviewError,
       errors
     )
   }
 
   if (page === 8) {
-    requireChecked(
-      state.understandData,
-      'understandData',
-      'Confirm you understand how your data will be used.',
-      errors
-    )
-  }
-
-  if (page === 9) {
-    requireChecked(
-      state.everythingTrue,
-      'everythingTrue',
-      'Confirm everything here is true.',
-      errors
-    )
+    // Privacy agree moved into consent (page 1 / step 2).
   }
 
   return errors
@@ -444,7 +414,10 @@ export function toTestRunPayload(state: TestRunFormState): unknown {
         ]
       : state.meetGenders,
     school: state.school.trim() || state.campus,
-    yearLevel: state.yearLevel || undefined,
+    yearLevel:
+      state.yearLevel === 'Others'
+        ? state.yearLevelOther.trim() || 'Others'
+        : state.yearLevel || undefined,
     departureArea: state.departureArea.trim() || state.school.trim() || state.campus,
     maxTravel: state.maxTravel || undefined,
     nearbySchoolOk: state.nearbySchoolOk || 'yes',
@@ -458,12 +431,12 @@ export function toTestRunPayload(state: TestRunFormState): unknown {
     hardNos: state.hardNos,
     understandEarly: state.understandEarly || undefined,
     publicCafe: state.publicCafe || undefined,
-    cancelEarly: state.cancelEarly || undefined,
+    cancelEarly: state.cancelEarly === 'yes' ? true : undefined,
     canReport: state.canReport || undefined,
-    interviewOk: state.interviewOk,
+    interviewOk: state.interviewOk === true ? true : undefined,
     emergencyName: state.emergencyName,
     emergencyPhone: state.emergencyPhone,
-    understandData: state.understandData || undefined,
+    understandData: state.consent || state.understandData || undefined,
     everythingTrue: state.everythingTrue || undefined,
     howHeard: state.howHeard,
     prefillEmail: state.prefillEmail,

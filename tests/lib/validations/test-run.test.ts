@@ -6,6 +6,11 @@ import {
   testRunPayloadSchema,
   validateTestRunPage,
 } from '@/lib/validations/test-run'
+import {
+  getActiveSteps,
+  stepBadgeNumber,
+  validateTestRunStep,
+} from '@/lib/test-run-steps'
 
 describe('looksLikePersonalInbox', () => {
   it('flags gmail and outlook', () => {
@@ -50,6 +55,90 @@ describe('testRunPayloadSchema', () => {
     const parsed = testRunPayloadSchema.safeParse(toTestRunPayload(completeState()))
     expect(parsed.success).toBe(true)
   })
+
+  it('treats page-1 consent as understandData without a later privacy step', () => {
+    const state = completeState()
+    state.understandData = false
+    expect(getActiveSteps(state)).not.toContain('dataNotice')
+    expect(getActiveSteps(state)).not.toContain('dataUse')
+    expect(validateTestRunPage(8, state)).toEqual({})
+    expect(testRunPayloadSchema.safeParse(toTestRunPayload(state)).success).toBe(
+      true
+    )
+  })
+
+  it('rejects interviewOk unless yes', () => {
+    const state = completeState()
+    state.interviewOk = false
+    expect(testRunPayloadSchema.safeParse(toTestRunPayload(state)).success).toBe(
+      false
+    )
+    state.interviewOk = null
+    expect(testRunPayloadSchema.safeParse(toTestRunPayload(state)).success).toBe(
+      false
+    )
+  })
+
+  it('rejects cancelEarly unless yes', () => {
+    const state = completeState()
+    state.cancelEarly = 'no'
+    expect(testRunPayloadSchema.safeParse(toTestRunPayload(state)).success).toBe(
+      false
+    )
+    state.cancelEarly = ''
+    expect(testRunPayloadSchema.safeParse(toTestRunPayload(state)).success).toBe(
+      false
+    )
+  })
+})
+
+describe('cancelEarly step', () => {
+  it('is badge 19 on the default path', () => {
+    const state = emptyTestRunState()
+    expect(getActiveSteps(state)).toContain('cancelEarly')
+    expect(stepBadgeNumber('cancelEarly', state)).toBe(19)
+  })
+
+  it('blocks empty and no, allows yes', () => {
+    const empty = emptyTestRunState()
+    expect(validateTestRunStep('cancelEarly', empty).cancelEarly).toBeTruthy()
+    empty.cancelEarly = 'no'
+    expect(validateTestRunStep('cancelEarly', empty).cancelEarly).toBeTruthy()
+    empty.cancelEarly = 'yes'
+    expect(validateTestRunStep('cancelEarly', empty)).toEqual({})
+  })
+})
+
+describe('emergency contact', () => {
+  it('is not in the live path', () => {
+    const state = emptyTestRunState()
+    const steps = getActiveSteps(state)
+    expect(steps).not.toContain('emergencyName')
+    expect(steps).not.toContain('emergencyPhone')
+    expect(new Set(steps).size).toBe(steps.length)
+  })
+})
+
+describe('interviewOk step', () => {
+  it('is badge 20 after cancelEarly', () => {
+    expect(stepBadgeNumber('interviewOk', emptyTestRunState())).toBe(20)
+  })
+
+  it('blocks empty and no, allows yes', () => {
+    const empty = emptyTestRunState()
+    expect(validateTestRunStep('interviewOk', empty).interviewOk).toBeTruthy()
+    empty.interviewOk = false
+    expect(validateTestRunStep('interviewOk', empty).interviewOk).toBeTruthy()
+    empty.interviewOk = true
+    expect(validateTestRunStep('interviewOk', empty)).toEqual({})
+    expect(validateTestRunPage(7, empty).interviewOk).toBeUndefined()
+  })
+})
+
+describe('everythingTrue step', () => {
+  it('is not in the live path', () => {
+    expect(getActiveSteps(emptyTestRunState())).not.toContain('everythingTrue')
+  })
 })
 
 function completeState() {
@@ -68,7 +157,7 @@ function completeState() {
   state.isMe = true
   state.gender = 'Woman'
   state.meetGenders = ['Men']
-  state.school = 'Ateneo de Manila'
+  state.school = 'Ateneo de Manila University'
   state.yearLevel = '2nd year'
   state.maxTravel = '30 minutes'
   state.nearbySchoolOk = 'yes'
@@ -81,9 +170,9 @@ function completeState() {
   ]
   state.understandEarly = true
   state.publicCafe = true
-  state.cancelEarly = true
   state.canReport = true
-  state.understandData = true
+  state.cancelEarly = 'yes'
+  state.interviewOk = true
   state.everythingTrue = true
   return state
 }

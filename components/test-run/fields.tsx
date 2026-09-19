@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { testRunContent } from '@/lib/test-run-content'
 
 export function StepBadge({ page }: { page: number }) {
   return (
@@ -20,6 +21,15 @@ function StepBadgeSlot({ page }: { page: number }) {
       <StepBadge page={page} />
     </span>
   )
+}
+
+/** Prefer a single title line; wrap only when the copy is long. */
+const TITLE_WRAP_CHARS = 56
+
+function titleLineClass(title: string) {
+  return title.length >= TITLE_WRAP_CHARS
+    ? 'min-w-0'
+    : 'max-sm:whitespace-normal sm:whitespace-nowrap'
 }
 
 export function Question({
@@ -47,7 +57,7 @@ export function Question({
           className="flex items-start gap-3 font-open-sauce text-[length:var(--q-title)] font-medium leading-snug tracking-tight text-[var(--q-text)]"
         >
           {number != null ? <StepBadgeSlot page={number} /> : null}
-          <span>
+          <span className={titleLineClass(title)}>
             {title}
             {optional ? (
               <span className="ml-2 align-middle text-base font-normal text-[var(--q-muted)]">
@@ -57,12 +67,7 @@ export function Question({
           </span>
         </label>
         {helper ? (
-          <p
-            className={[
-              'max-w-[40rem] text-[length:var(--q-body)] font-normal leading-relaxed text-[var(--q-muted)]',
-              number != null ? 'pl-[calc(var(--q-badge)+0.75rem)]' : '',
-            ].join(' ')}
-          >
+          <p className="max-w-[40rem] text-[length:var(--q-body)] font-normal leading-relaxed text-[var(--q-muted)]">
             {helper}
           </p>
         ) : null}
@@ -86,10 +91,11 @@ export function Statement({ children }: { children: ReactNode }) {
 }
 
 export function PageTitle({ page, children }: { page: number; children: ReactNode }) {
+  const text = typeof children === 'string' ? children : null
   return (
     <h1 className="flex items-start gap-3 font-open-sauce text-[length:var(--q-title)] font-medium leading-snug tracking-tight text-[var(--q-text)]">
       <StepBadgeSlot page={page} />
-      <span>{children}</span>
+      <span className={text ? titleLineClass(text) : 'min-w-0'}>{children}</span>
     </h1>
   )
 }
@@ -153,15 +159,19 @@ export function SelectInput({
   className = '',
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) {
+  const filled = props.value != null && String(props.value) !== ''
   return (
     <div className="relative w-full">
       <select
         {...props}
         aria-invalid={invalid || undefined}
         className={[
-          'w-full appearance-none border-0 border-b-2 border-[var(--q-track)] bg-transparent py-3 pr-10 font-open-sauce text-[length:var(--q-body)] leading-normal text-[var(--q-text)] outline-none transition-[border-color] duration-200 rounded-none focus:border-[var(--q-track)]',
+          'w-full appearance-none border-0 border-b-2 bg-transparent py-3 pr-10 font-open-sauce text-[length:var(--q-body)] leading-normal outline-none transition-[border-color,color] duration-200 rounded-none',
           '[-webkit-appearance:none] [-moz-appearance:none]',
-          invalid ? 'border-[var(--q-error)] focus:border-[var(--q-error)]' : '',
+          filled
+            ? 'border-[var(--q-accent)] text-[var(--q-accent)] focus:border-[var(--q-accent)]'
+            : 'border-[var(--q-track)] text-[var(--q-ink)] focus:border-[var(--q-track)]',
+          invalid ? 'border-[var(--q-error)] text-[var(--q-error)] focus:border-[var(--q-error)]' : '',
           className,
         ].join(' ')}
       >
@@ -169,7 +179,10 @@ export function SelectInput({
       </select>
       <span
         aria-hidden
-        className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[var(--q-text)]"
+        className={[
+          'pointer-events-none absolute right-0 top-1/2 -translate-y-1/2',
+          filled ? 'text-[var(--q-accent)]' : 'text-[var(--q-ink)]',
+        ].join(' ')}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path
@@ -181,6 +194,56 @@ export function SelectInput({
           />
         </svg>
       </span>
+    </div>
+  )
+}
+
+export function SchoolSelect({
+  id,
+  value,
+  invalid,
+  options = testRunContent.schoolOptions,
+  onChange,
+}: {
+  id?: string
+  value: string
+  invalid?: boolean
+  options?: readonly string[]
+  onChange: (next: string) => void
+}) {
+  const list = options.length > 0 ? [...options] : [...testRunContent.schoolOptions]
+  const known = list.filter((school) => school !== 'Other')
+  const isListed = known.includes(value)
+  const selectValue = !value ? '' : isListed ? value : 'Other'
+  const showOther = selectValue === 'Other'
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <SelectInput
+        id={id}
+        value={selectValue}
+        invalid={invalid}
+        onChange={(event) => {
+          const next = event.target.value
+          onChange(next === 'Other' ? 'Other' : next)
+        }}
+      >
+        <option value="">Choose one</option>
+        {list.map((school) => (
+          <option key={school} value={school}>
+            {school}
+          </option>
+        ))}
+      </SelectInput>
+      {showOther ? (
+        <TextInput
+          id={id ? `${id}-other` : undefined}
+          value={value === 'Other' ? '' : value}
+          invalid={invalid}
+          placeholder="Type your school…"
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -207,31 +270,13 @@ export function ChoiceButton({
       type="button"
       {...props}
       className={[
-        'flex min-h-12 w-full items-center gap-3.5 rounded-[8px] bg-transparent px-0 py-2.5 text-left font-open-sauce text-[length:var(--q-body)] font-medium text-[var(--q-text)] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98]',
+        'flex min-h-12 w-full items-center gap-3.5 rounded-[8px] bg-transparent px-0 py-2.5 text-left font-open-sauce text-[length:var(--q-body)] font-medium transition-[color,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98]',
+        selected ? 'text-[var(--q-accent)]' : 'text-[var(--q-ink)]',
         props.className ?? '',
       ].join(' ')}
       aria-pressed={selected}
     >
-      <span
-        aria-hidden
-        className={[
-          'grid h-[var(--q-key)] w-[var(--q-key)] shrink-0 place-items-center border-2 border-[var(--q-text)]',
-          shape === 'circle' ? 'rounded-full' : 'rounded-[4px]',
-          selected ? 'bg-[var(--q-text)]' : 'bg-transparent',
-        ].join(' ')}
-      >
-        {selected ? (
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path
-              d="M2.2 6.2 4.6 8.6 9.8 3.4"
-              stroke="#fff"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        ) : null}
-      </span>
+      <ChoiceMark selected={selected} shape={shape} />
       <span className="pr-2">{children}</span>
     </button>
   )
@@ -248,9 +293,11 @@ function ChoiceMark({
     <span
       aria-hidden
       className={[
-        'grid h-[var(--q-key)] w-[var(--q-key)] shrink-0 place-items-center border-2 border-[var(--q-text)]',
+        'grid h-[var(--q-key)] w-[var(--q-key)] shrink-0 place-items-center border-2 transition-colors duration-200',
         shape === 'circle' ? 'rounded-full' : 'rounded-[4px]',
-        selected ? 'bg-[var(--q-text)]' : 'bg-transparent',
+        selected
+          ? 'border-[var(--q-accent)] bg-[var(--q-accent)]'
+          : 'border-[var(--q-ink)] bg-transparent',
       ].join(' ')}
     >
       {selected ? (
@@ -272,6 +319,7 @@ function ChoiceMark({
 export function OtherChoiceInput({
   active,
   value,
+  label = 'Other',
   shape = 'circle',
   invalid,
   onActivate,
@@ -280,6 +328,7 @@ export function OtherChoiceInput({
 }: {
   active: boolean
   value: string
+  label?: string
   shape?: 'circle' | 'square'
   invalid?: boolean
   onActivate: () => void
@@ -295,7 +344,7 @@ export function OtherChoiceInput({
   if (!active) {
     return (
       <ChoiceButton shape={shape} selected={false} onClick={onActivate}>
-        Other
+        {label}
       </ChoiceButton>
     )
   }
@@ -320,10 +369,10 @@ export function OtherChoiceInput({
           }
         }}
         className={[
-          'min-w-0 flex-1 border-0 border-b-2 bg-transparent px-0 py-1 font-open-sauce text-[length:var(--q-body)] font-medium text-[var(--q-text)] caret-[var(--q-text)] outline-none placeholder:font-medium placeholder:text-[var(--q-muted)] rounded-none',
+          'min-w-0 flex-1 border-0 border-b-2 bg-transparent px-0 py-1 font-open-sauce text-[length:var(--q-body)] font-medium text-[var(--q-accent)] caret-[var(--q-accent)] outline-none placeholder:font-medium placeholder:text-[var(--q-muted)] rounded-none',
           invalid
             ? 'border-[var(--q-error)]'
-            : 'border-[var(--q-track)] focus:border-[var(--q-track)]',
+            : 'border-[var(--q-accent)] focus:border-[var(--q-accent)]',
         ].join(' ')}
       />
     </div>
@@ -351,7 +400,7 @@ export function CheckRow({
             <StepBadge page={number} />
           </span>
         ) : null}
-        <label className="flex flex-1 cursor-pointer items-start gap-3.5 rounded-[8px] py-1 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[var(--q-text)]">
+        <label className="flex flex-1 cursor-pointer items-start gap-3.5 rounded-[8px] py-1 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[var(--q-accent)]">
           <input
             type="checkbox"
             className="peer sr-only"
@@ -361,8 +410,10 @@ export function CheckRow({
           <span
             aria-hidden
             className={[
-              'mt-0.5 grid h-[var(--q-key)] w-[var(--q-key)] shrink-0 place-items-center rounded-[4px] border-2 border-[var(--q-text)]',
-              checked ? 'bg-[var(--q-text)]' : 'bg-transparent',
+              'mt-0.5 grid h-[var(--q-key)] w-[var(--q-key)] shrink-0 place-items-center rounded-[4px] border-2 transition-colors duration-200',
+              checked
+                ? 'border-[var(--q-accent)] bg-[var(--q-accent)]'
+                : 'border-[var(--q-ink)] bg-transparent',
             ].join(' ')}
           >
             {checked ? (
@@ -377,7 +428,12 @@ export function CheckRow({
               </svg>
             ) : null}
           </span>
-          <span className="font-open-sauce text-[length:var(--q-body)] font-normal leading-relaxed text-[var(--q-text)]">
+          <span
+            className={[
+              'font-open-sauce text-[length:var(--q-body)] font-normal leading-relaxed transition-colors duration-200',
+              checked ? 'text-[var(--q-accent)]' : 'text-[var(--q-ink)]',
+            ].join(' ')}
+          >
             {children}
           </span>
         </label>
@@ -462,12 +518,14 @@ export function DealbreakerList({
           Boolean(item.trim()) &&
           (index < items.length - 1 || items.length === 3)
         return (
-          <div key={`dealbreaker-${index}`} className="flex items-center gap-3">
+          <div key={`dealbreaker-${index}`} className="flex items-center">
             <span
               aria-hidden
               className={[
-                'grid w-4 shrink-0 place-items-center text-[length:var(--q-body)] leading-none',
-                showBullet ? 'text-[var(--q-text)]' : 'text-transparent',
+                'shrink-0 overflow-hidden text-[length:var(--q-body)] leading-none transition-[width,margin,opacity] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                showBullet
+                  ? 'mr-2 w-4 opacity-100 text-[var(--q-text)]'
+                  : 'mr-0 w-0 opacity-0 text-transparent',
               ].join(' ')}
             >
               •
@@ -487,7 +545,7 @@ export function DealbreakerList({
               onChange={(event) => setItem(index, event.target.value)}
               onKeyDown={(event) => handleKeyDown(index, event)}
               className={[
-                'min-w-0 flex-1',
+                'min-w-0 flex-1 transition-[padding] duration-200',
                 underlineBase,
                 invalid
                   ? 'border-[var(--q-error)] focus:border-[var(--q-error)]'

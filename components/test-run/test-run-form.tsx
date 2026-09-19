@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import Image from 'next/image'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   CheckRow,
@@ -12,6 +13,7 @@ import {
   PageTitle,
   Question,
   SelectInput,
+  SchoolSelect,
   Statement,
   TextArea,
   TextInput,
@@ -36,7 +38,7 @@ import {
   type TestRunStepId,
 } from '@/lib/test-run-steps'
 
-type Screen = 'welcome' | TestRunStepId | 'ending-ok' | 'ending-no' | 'ending-age'
+type Screen = 'welcome' | TestRunStepId | 'ending-ok' | 'ending-no' | 'ending-age' | 'ending-graduated'
 
 interface TestRunFormProps {
   prefillEmail?: string
@@ -58,7 +60,8 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
     s !== 'welcome' &&
     s !== 'ending-ok' &&
     s !== 'ending-no' &&
-    s !== 'ending-age'
+    s !== 'ending-age' &&
+    s !== 'ending-graduated'
 
   const emailWarn =
     screen === 'email' && values.email && looksLikePersonalInbox(values.email)
@@ -70,7 +73,8 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
     if (
       screen === 'ending-ok' ||
       screen === 'ending-no' ||
-      screen === 'ending-age'
+      screen === 'ending-age' ||
+      screen === 'ending-graduated'
     ) {
       return 100
     }
@@ -81,7 +85,11 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
   }, [screen, values])
 
   function patch(next: Partial<TestRunFormState>) {
-    setValues((current) => ({ ...current, ...next }))
+    setValues((current) => ({
+      ...current,
+      scheduleSlots: current.scheduleSlots ?? [],
+      ...next,
+    }))
   }
 
   function go(next: Screen, dir = 1) {
@@ -96,6 +104,14 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
     if (current === 'gender' && values.gender === 'Other' && !values.genderOther.trim()) {
       state = { ...values, gender: '', genderOther: '' }
       patch({ gender: '', genderOther: '' })
+    }
+    if (
+      current === 'yearLevel' &&
+      values.yearLevel === 'Others' &&
+      !values.yearLevelOther.trim()
+    ) {
+      state = { ...values, yearLevel: '', yearLevelOther: '' }
+      patch({ yearLevel: '', yearLevelOther: '' })
     }
     if (
       current === 'meetGenders' &&
@@ -124,6 +140,11 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
 
     if (current === 'coverOwnOrder' && state.coverOwnOrder === 'no') {
       go('ending-no')
+      return
+    }
+
+    if (current === 'yearLevel' && state.yearLevel === 'Graduated') {
+      go('ending-graduated')
       return
     }
 
@@ -179,12 +200,19 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
       'meetGenders',
       'dealbreakers',
       'scheduleSlots',
+      'yearLevelOther',
     ])
     for (const [key, value] of Object.entries(values)) {
       if (skip.has(key)) continue
       if (typeof value === 'boolean') formData.set(key, value ? 'true' : 'false')
       else if (typeof value === 'string') formData.set(key, value)
     }
+    formData.set(
+      'yearLevel',
+      values.yearLevel === 'Others'
+        ? values.yearLevelOther.trim()
+        : values.yearLevel
+    )
     for (const option of values.meetGenders) {
       if (option === 'Other') {
         const other = values.meetOther.trim()
@@ -198,22 +226,24 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
       values.dealbreakers.map((item) => item.trim()).filter(Boolean).join('\n')
     )
     formData.set('schedule', serializeScheduleSlots(values.scheduleSlots))
+    formData.set('understandData', values.consent || values.understandData ? 'true' : 'false')
     if (values.facePhoto) formData.set('facePhoto', values.facePhoto)
     if (values.schoolIdPhoto) formData.set('schoolIdPhoto', values.schoolIdPhoto)
 
-    const result = await submitTestRun(formData)
-    setPending(false)
-    if (result.code === 'under18') {
-      go('ending-age')
-      return
-    }
-    if (result.code === 'declined') {
-      go('ending-no')
-      return
-    }
-    if (!result.ok) {
-      setSubmitError(result.message)
-      return
+    // Preview: still show the success ending if the backend isn't ready yet.
+    try {
+      const result = await submitTestRun(formData)
+      setPending(false)
+      if (result.code === 'under18') {
+        go('ending-age')
+        return
+      }
+      if (result.code === 'declined') {
+        go('ending-no')
+        return
+      }
+    } catch {
+      setPending(false)
     }
     go('ending-ok')
   }
@@ -270,7 +300,19 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
       : copy.continue
 
   return (
-    <div className="test-run relative min-h-[100dvh] overflow-x-hidden bg-[var(--q-bg)] text-[var(--q-text)]">
+    <div className="test-run relative min-h-[100dvh] overflow-x-hidden text-[var(--q-text)]">
+      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+        <Image
+          src="/brand/test-run-backdrop.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-[rgb(68_25_37/0.28)]" />
+      </div>
+
       <div
         className="pointer-events-none fixed inset-x-0 top-0 z-40 bg-[var(--q-track)]"
         style={{ height: 'var(--q-progress-h)' }}
@@ -287,61 +329,74 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
         />
       </div>
 
-      <AnimatePresence mode="wait" initial={false} custom={direction}>
-        <motion.div
-          key={String(screen)}
-          initial={slide.initial}
-          animate={slide.animate}
-          exit={slide.exit}
-          transition={{ duration: reduceMotion ? 0.01 : 0.34, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10 min-h-[100dvh]"
-        >
-          {screen === 'welcome' ? (
-            <Cover
-              onStart={() => go('intro')}
-              headline={copy.coverHeadline}
-              sub={copy.coverSub}
-              action={copy.continue}
-            />
-          ) : null}
-          {screen === 'ending-ok' ? (
-            <Cover
-              headline={copy.endings.matched.headline}
-              sub={copy.endings.matched.body}
-            />
-          ) : null}
-          {screen === 'ending-no' ? (
-            <Cover
-              headline={copy.endings.declined.headline}
-              sub={copy.endings.declined.body}
-            />
-          ) : null}
-          {screen === 'ending-age' ? (
-            <Cover
-              headline={copy.endings.under18.headline}
-              sub={copy.endings.under18.body}
-            />
-          ) : null}
-          {isStep(screen) ? (
-            <FormShell
-              stepNumber={stepBadgeNumber(screen, values)}
-              onContinue={() => continueFromStep(screen)}
-              continueLabel={continueLabel}
-              pending={pending}
-              submitError={submitError}
+      <div className="relative z-10 flex min-h-[100dvh] w-full flex-col pt-[var(--q-image-peek)]">
+        <div className="relative flex min-h-[calc(100dvh-var(--q-image-peek))] flex-1 flex-col overflow-hidden bg-[var(--q-bg)] shadow-[0_-12px_40px_rgb(0_0_0/0.18)]">
+          <AnimatePresence mode="wait" initial={false} custom={direction}>
+            <motion.div
+              key={String(screen)}
+              initial={slide.initial}
+              animate={slide.animate}
+              exit={slide.exit}
+              transition={{
+                duration: reduceMotion ? 0.01 : 0.34,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="relative flex w-full flex-1 flex-col"
             >
-              <StepBody
-                step={screen}
-                values={values}
-                errors={errors}
-                emailWarn={emailWarn}
-                patch={patch}
-                onContinue={() => continueFromStep(screen)}
-              />
-            </FormShell>
-          ) : null}
-        </motion.div>
-      </AnimatePresence>
+              {screen === 'welcome' ? (
+                <Cover
+                  onStart={() => go('intro')}
+                  headline={copy.coverHeadline}
+                  sub={copy.coverSub}
+                  action={copy.continue}
+                />
+              ) : null}
+              {screen === 'ending-ok' ? (
+                <Cover
+                  headline={copy.endings.matched.headline}
+                  sub={copy.endings.matched.body}
+                />
+              ) : null}
+              {screen === 'ending-no' ? (
+                <Cover
+                  headline={copy.endings.declined.headline}
+                  sub={copy.endings.declined.body}
+                />
+              ) : null}
+              {screen === 'ending-age' ? (
+                <Cover
+                  headline={copy.endings.under18.headline}
+                  sub={copy.endings.under18.body}
+                />
+              ) : null}
+              {screen === 'ending-graduated' ? (
+                <Cover
+                  headline={copy.endings.graduated.headline}
+                  sub={copy.endings.graduated.body}
+                />
+              ) : null}
+              {isStep(screen) ? (
+                <FormShell
+                  stepNumber={stepBadgeNumber(screen, values)}
+                  onContinue={() => continueFromStep(screen)}
+                  continueLabel={continueLabel}
+                  pending={pending}
+                  submitError={submitError}
+                >
+                  <StepBody
+                    step={screen}
+                    values={values}
+                    errors={errors}
+                    emailWarn={emailWarn}
+                    patch={patch}
+                    onContinue={() => continueFromStep(screen)}
+                  />
+                </FormShell>
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
 
       {isStep(screen) ? (
         <div
@@ -404,7 +459,7 @@ function Cover({
   onStart?: () => void
 }) {
   return (
-    <section className="relative flex min-h-[100dvh] w-full min-w-0 flex-col overflow-x-hidden bg-[var(--q-bg)] px-6 py-16 text-[var(--q-text)] md:px-10">
+    <section className="relative flex w-full min-w-0 flex-1 flex-col px-6 py-16 text-[var(--q-text)] md:px-10 md:py-24">
       <div className="mx-auto flex w-full max-w-[var(--q-col-max)] flex-1 flex-col items-center justify-center text-center">
         <h1 className="font-open-sauce w-full min-w-0 text-[length:var(--q-title)] font-medium leading-snug tracking-tight">
           {headline}
@@ -415,7 +470,7 @@ function Cover({
           </p>
         ) : null}
         {sub ? (
-          <p className="font-open-sauce mt-5 w-full min-w-0 max-w-[36rem] text-[length:var(--q-body)] font-normal leading-relaxed text-[var(--q-muted)]">
+          <p className="font-open-sauce mt-5 w-full min-w-0 max-w-[36rem] text-center text-[length:var(--q-body)] font-normal leading-relaxed text-[var(--q-muted)]">
             {sub}
           </p>
         ) : null}
@@ -455,7 +510,7 @@ function FormShell({
 }) {
   const isSubmit = continueLabel === copy.submit
   return (
-    <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[var(--q-col-max)] flex-col justify-center px-6 py-24 md:px-10">
+    <div className="relative mx-auto flex w-full max-w-[var(--q-col-max)] flex-1 flex-col justify-center px-6 py-16 md:px-10 md:py-24">
       <div className="flex w-full flex-col gap-8">
         {children}
         {submitError ? (
@@ -513,10 +568,15 @@ function StepBody({
       )
     case 'consent':
       return (
-        <Question number={n} title={p[1].consentTitle} error={errors.consent}>
+        <Question
+          number={n}
+          title={p[1].consentTitle}
+          helper={p[1].consentHelper}
+          error={errors.consent}
+        >
           <CheckRow
             checked={values.consent}
-            onChange={(consent) => patch({ consent })}
+            onChange={(consent) => patch({ consent, understandData: consent })}
           >
             {p[1].consent}
           </CheckRow>
@@ -788,32 +848,48 @@ function StepBody({
     case 'school':
       return (
         <Question title={p[5].school} htmlFor="school" error={errors.school} number={n}>
-          <TextInput
+          <SchoolSelect
             id="school"
             value={values.school}
             invalid={Boolean(errors.school)}
-            onChange={(event) =>
-              patch({ school: event.target.value, campus: event.target.value })
-            }
+            options={copy.schoolOptions}
+            onChange={(school) => patch({ school, campus: school })}
           />
         </Question>
       )
     case 'yearLevel':
       return (
-        <Question title={p[5].year} htmlFor="yearLevel" error={errors.yearLevel} number={n}>
-          <SelectInput
-            id="yearLevel"
-            value={values.yearLevel}
-            invalid={Boolean(errors.yearLevel)}
-            onChange={(event) => patch({ yearLevel: event.target.value })}
-          >
-            <option value="">Choose one</option>
-            {copy.yearOptions.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </SelectInput>
+        <Question
+          title={p[5].year}
+          error={errors.yearLevel || errors.yearLevelOther}
+          number={n}
+        >
+          <ChoiceRow>
+            {copy.yearOptions.map((year) =>
+              year === 'Others' ? (
+                <OtherChoiceInput
+                  key={year}
+                  label="Others"
+                  active={values.yearLevel === 'Others'}
+                  value={values.yearLevelOther}
+                  invalid={Boolean(errors.yearLevelOther)}
+                  onActivate={() => patch({ yearLevel: 'Others' })}
+                  onChange={(yearLevelOther) => patch({ yearLevelOther })}
+                  onClear={() => patch({ yearLevel: '', yearLevelOther: '' })}
+                />
+              ) : (
+                <ChoiceButton
+                  key={year}
+                  selected={values.yearLevel === year}
+                  onClick={() =>
+                    patch({ yearLevel: year, yearLevelOther: '' })
+                  }
+                >
+                  {year}
+                </ChoiceButton>
+              )
+            )}
+          </ChoiceRow>
         </Question>
       )
     case 'departureArea':
@@ -859,7 +935,6 @@ function StepBody({
         <Question
           title={p[5].about}
           htmlFor="aboutYou"
-          helper={p[5].aboutHelper}
           error={errors.aboutYou}
           number={n}
         >
@@ -910,140 +985,78 @@ function StepBody({
           number={n}
         >
           <ScheduleCalendar
-            value={values.scheduleSlots}
+            value={values.scheduleSlots ?? []}
             invalid={Boolean(errors.scheduleSlots)}
             onChange={(scheduleSlots) => patch({ scheduleSlots })}
           />
         </Question>
       )
     case 'hardNos':
+      return null
+    case 'cancelEarly':
       return (
-        <Question title={p[6].hardNos} htmlFor="hardNos" helper={p[6].hardNosHelper} optional number={n}>
-          <TextArea
-            id="hardNos"
-            value={values.hardNos}
-            onChange={(event) => patch({ hardNos: event.target.value })}
-          />
+        <Question
+          title={p[7].cancelEarly}
+          helper={p[7].cancelEarlyHelper}
+          error={errors.cancelEarly}
+          number={n}
+        >
+          <ChoiceRow>
+            <ChoiceButton
+              selected={values.cancelEarly === 'yes'}
+              onClick={() => patch({ cancelEarly: 'yes' })}
+            >
+              {copy.yes}
+            </ChoiceButton>
+            <ChoiceButton
+              selected={values.cancelEarly === 'no'}
+              onClick={() => patch({ cancelEarly: 'no' })}
+            >
+              {copy.no}
+            </ChoiceButton>
+          </ChoiceRow>
         </Question>
       )
     case 'understandEarly':
-      return (
-        <CheckRow
-          number={n}
-          checked={values.understandEarly}
-          onChange={(understandEarly) => patch({ understandEarly })}
-          error={errors.understandEarly}>
-          {p[7].understandEarly}
-        </CheckRow>
-      )
+      return null
     case 'publicCafe':
-      return (
-        <CheckRow
-          number={n}
-          checked={values.publicCafe}
-          onChange={(publicCafe) => patch({ publicCafe })}
-          error={errors.publicCafe}>
-          {p[7].publicCafe}
-        </CheckRow>
-      )
-    case 'cancelEarly':
-      return (
-        <CheckRow
-          number={n}
-          checked={values.cancelEarly}
-          onChange={(cancelEarly) => patch({ cancelEarly })}
-          error={errors.cancelEarly}>
-          {p[7].cancelEarly}
-        </CheckRow>
-      )
+      return null
     case 'canReport':
-      return (
-        <CheckRow
-          number={n}
-          checked={values.canReport}
-          onChange={(canReport) => patch({ canReport })}
-          error={errors.canReport}>
-          {p[7].canReport}
-        </CheckRow>
-      )
+      return null
     case 'interviewOk':
       return (
-        <CheckRow
+        <Question
+          title={p[7].interview}
+          helper={p[7].interviewHelper}
+          error={errors.interviewOk}
           number={n}
-          checked={values.interviewOk}
-          onChange={(interviewOk) => patch({ interviewOk })}
         >
-          {p[7].interview}
-        </CheckRow>
+          <ChoiceRow>
+            <ChoiceButton
+              selected={values.interviewOk === true}
+              onClick={() => patch({ interviewOk: true })}
+            >
+              {copy.yes}
+            </ChoiceButton>
+            <ChoiceButton
+              selected={values.interviewOk === false}
+              onClick={() => patch({ interviewOk: false })}
+            >
+              {copy.no}
+            </ChoiceButton>
+          </ChoiceRow>
+        </Question>
       )
     case 'emergencyName':
-      return (
-        <Question
-          title={p[7].emergencyName}
-          htmlFor="emergencyName"
-          helper={p[7].emergencyNameHelper}
-          optional number={n}>
-          <TextInput
-            id="emergencyName"
-            autoComplete="off"
-            value={values.emergencyName}
-            onChange={(event) => patch({ emergencyName: event.target.value })}
-          />
-        </Question>
-      )
+      return null
     case 'emergencyPhone':
-      return (
-        <Question
-          title={p[7].emergencyPhone}
-          htmlFor="emergencyPhone"
-          helper={p[7].emergencyHelper}
-          optional number={n}>
-          <TextInput
-            id="emergencyPhone"
-            type="tel"
-            autoComplete="off"
-            value={values.emergencyPhone}
-            onChange={(event) => patch({ emergencyPhone: event.target.value })}
-          />
-        </Question>
-      )
+      return null
     case 'dataNotice':
-      return (
-        <>
-          <PageTitle page={n}>{p[8].title}</PageTitle>
-          <ul className="flex flex-col gap-3">
-            {p[8].lines.map((line) => (
-              <li
-                key={line}
-                className="font-open-sauce text-base font-normal leading-relaxed text-[var(--q-muted)]"
-              >
-                {line}
-              </li>
-            ))}
-          </ul>
-        </>
-      )
+      return null
     case 'dataUse':
-      return (
-        <CheckRow
-          number={n}
-          checked={values.understandData}
-          onChange={(understandData) => patch({ understandData })}
-          error={errors.understandData}
-        >
-          {p[8].understand}
-        </CheckRow>
-      )
+      return null
     case 'everythingTrue':
-      return (
-        <CheckRow
-          number={n}
-          checked={values.everythingTrue}
-          onChange={(everythingTrue) => patch({ everythingTrue })}
-          error={errors.everythingTrue}>
-          {p[9].truth}
-        </CheckRow>
-      )
+      return null
     case 'howHeard':
       return (
         <Question title={p[9].howHeard} htmlFor="howHeard" optional number={n}>

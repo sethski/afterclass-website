@@ -70,17 +70,8 @@ const BASE_STEPS: TestRunStepId[] = [
   'aboutYou',
   'coverOwnOrder',
   'schedule',
-  'hardNos',
-  'understandEarly',
-  'publicCafe',
   'cancelEarly',
-  'canReport',
   'interviewOk',
-  'emergencyName',
-  'emergencyPhone',
-  'dataNotice',
-  'dataUse',
-  'everythingTrue',
 ]
 
 export function getActiveSteps(values: TestRunFormState): TestRunStepId[] {
@@ -141,7 +132,6 @@ export function validateTestRunStep(
     case 'refuseAreas':
     case 'accessibility':
     case 'hardNos':
-    case 'interviewOk':
     case 'emergencyName':
     case 'emergencyPhone':
       break
@@ -153,7 +143,7 @@ export function validateTestRunStep(
       }
       break
     case 'consent':
-      if (!state.consent) errors.consent = p[1].consentHelper
+      if (!state.consent) errors.consent = p[1].consentError
       break
     case 'wantIn':
       if (state.wantIn !== 'yes' && state.wantIn !== 'no') {
@@ -229,10 +219,15 @@ export function validateTestRunStep(
     case 'meetOther':
       break
     case 'school':
-      if (!state.school.trim()) errors.school = 'Enter your school.'
+      if (!state.school.trim() || state.school === 'Other') {
+        errors.school = 'Choose your school.'
+      }
       break
     case 'yearLevel':
       if (!state.yearLevel) errors.yearLevel = 'Choose your year level.'
+      if (state.yearLevel === 'Others' && !state.yearLevelOther.trim()) {
+        errors.yearLevelOther = 'Tell us your year level.'
+      }
       break
     case 'departureArea':
       break
@@ -259,34 +254,24 @@ export function validateTestRunStep(
       }
       break
     case 'understandEarly':
-      if (!state.understandEarly) {
-        errors.understandEarly = 'Confirm you understand this is a dry run.'
-      }
       break
     case 'publicCafe':
-      if (!state.publicCafe) {
-        errors.publicCafe = 'Confirm public daytime cafe only.'
-      }
-      break
-    case 'cancelEarly':
-      if (!state.cancelEarly) {
-        errors.cancelEarly = 'Confirm you\'ll cancel early if you can\'t make it.'
-      }
       break
     case 'canReport':
-      if (!state.canReport) {
-        errors.canReport = 'Confirm you can report or leave anytime.'
+      break
+    case 'cancelEarly':
+      if (state.cancelEarly !== 'yes') {
+        errors.cancelEarly = p[7].cancelEarlyError
+      }
+      break
+    case 'interviewOk':
+      if (state.interviewOk !== true) {
+        errors.interviewOk = p[7].interviewError
       }
       break
     case 'dataUse':
-      if (!state.understandData) {
-        errors.understandData = 'Confirm you understand how your data will be used.'
-      }
       break
     case 'everythingTrue':
-      if (!state.everythingTrue) {
-        errors.everythingTrue = 'Confirm everything here is true.'
-      }
       break
   }
 

@@ -65,6 +65,14 @@ export async function submitTestRun(
     }
   }
 
+  if (readString(formData, 'yearLevel') === 'Graduated') {
+    return {
+      ok: false,
+      code: 'declined',
+      message: 'This run is for current students.',
+    }
+  }
+
   const ageRaw = Number(readString(formData, 'age'))
   if (Number.isFinite(ageRaw) && ageRaw < 18) {
     return {

@@ -1,5 +1,5 @@
 export const brandTokens = {
-  primaryMaroon: '#4A1525',
+  primaryMaroon: '#441925',
   primarySalmon: '#F39394',
   cream: '#FEF9E6',
   charcoal: '#2E2E2E',
