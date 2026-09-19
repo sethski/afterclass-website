@@ -11,13 +11,13 @@ Two public audiences on this deploy:
 - Students (teased here; waitlist convert on `join.afterclassapp.com` in a separate repo)
 - Local business partners (interest form on `/partners`)
 
-Plus a private early-testing funnel at `/TestRun` (noindex).
+Plus a private early-testing funnel at `/enlistment` (noindex). Old `/TestRun` aliases redirect there.
 
 ## Stack
 
 - Next.js 16 (App Router), React 19, TypeScript
 - Tailwind CSS 4, Motion, Zod
-- Supabase via service-role server client for partner, contact, and Test Run writes
+- Supabase: marketing project for partner/contact; separate enlistment project (`TEST_RUN_SUPABASE_URL`) for `/enlistment` and admin ops (not the waitlist DB)
 - Vitest for unit tests
 - Self-hosted fonts: SN Pro + Open Sauce Two
 
@@ -25,8 +25,10 @@ Plus a private early-testing funnel at `/TestRun` (noindex).
 
 | Host | Surface |
 |------|---------|
-| `afterclassapp.com` | This repo: Home, How it works, Partners, Contact, Privacy, `/TestRun` |
-| `join.afterclassapp.com` | Waitlist — [afterclass-waitlist](https://github.com/sethski/afterclass-waitlist) |
+| `afterclassapp.com` | Origin-replica `/join` on Vercel team `afterclass1` (not this repo). `/enlistment` still 404 there as of 2026-09-19. |
+| `afterclass-website.vercel.app` | This repo: marketing + native `/enlistment` |
+| `origin-replica.vercel.app` | This team's iframe shell of `/enlistment` beside a copy of `/join` |
+| `join.afterclassapp.com` | This team's `afterclass-waitlist` (Open Sauce), not origin-replica |
 
 ## Constraints
 

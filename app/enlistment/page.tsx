@@ -16,7 +16,7 @@ function firstString(value: string | string[] | undefined): string | undefined {
   return value
 }
 
-export default async function TestRunPage({
+export default async function EnlistmentPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>

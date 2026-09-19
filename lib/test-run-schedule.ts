@@ -1,9 +1,11 @@
 export type ScheduleSlot = {
   date: string // YYYY-MM-DD
-  startHour: number // 9–16
+  startHour: number // 9, 11, 14, or 16
   duration: 2 | 3
 }
 
+export const SCHEDULE_SLOT_DURATION = 2 as const
+export const SCHEDULE_START_HOURS = [9, 11, 14, 16] as const
 export const SCHEDULE_DAYTIME_END = 18
 export const SCHEDULE_TZ = 'Asia/Manila'
 export const SCHEDULE_WINDOW_DAYS = 28
@@ -45,7 +47,7 @@ export function serializeScheduleSlots(
 }
 
 export function validStartHours(duration: 2 | 3): number[] {
-  return [9, 10, 11, 12, 13, 14, 15, 16].filter(
+  return SCHEDULE_START_HOURS.filter(
     (hour) => hour + duration <= SCHEDULE_DAYTIME_END
   )
 }
@@ -138,7 +140,7 @@ export function scheduleWindow(from = new Date()): ScheduleWindow {
   // After daytime ends in Manila, today is no longer bookable.
   if (parts.hour >= SCHEDULE_DAYTIME_END) {
     minDate = addCalendarDays(today, 1)
-  } else if (validStartHoursForDate(todayKey, 2, from).length === 0) {
+  } else if (validStartHoursForDate(todayKey, SCHEDULE_SLOT_DURATION, from).length === 0) {
     minDate = addCalendarDays(today, 1)
   }
 
@@ -217,7 +219,7 @@ export function scheduleDayRange(from = new Date()): Date[] {
 
 export function isCompleteSlot(slot: ScheduleSlot | undefined): boolean {
   if (!slot) return false
-  if (slot.duration !== 2 && slot.duration !== 3) return false
+  if (slot.duration !== SCHEDULE_SLOT_DURATION) return false
   return validStartHours(slot.duration).includes(slot.startHour)
 }
 

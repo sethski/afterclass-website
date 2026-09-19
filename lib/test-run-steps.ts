@@ -1,6 +1,7 @@
 import { testRunContent as copy } from '@/lib/test-run-content'
 import {
   fileError,
+  isEduPhEmail,
   type TestRunFormState,
 } from '@/lib/validations/test-run'
 import { scheduleSlotsValid } from '@/lib/test-run-schedule'
@@ -116,6 +117,24 @@ export function prevStep(
   return steps[i - 1]!
 }
 
+export const TEST_RUN_ENDINGS = [
+  'ending-ok',
+  'ending-no',
+  'ending-age',
+  'ending-graduated',
+] as const
+
+export type TestRunEnding = (typeof TEST_RUN_ENDINGS)[number]
+export type TestRunScreen = 'welcome' | TestRunStepId | TestRunEnding
+
+export function isTestRunEnding(value: string): value is TestRunEnding {
+  return (TEST_RUN_ENDINGS as readonly string[]).includes(value)
+}
+
+export function isTestRunStepScreen(value: string): value is TestRunStepId {
+  return value !== 'welcome' && !isTestRunEnding(value)
+}
+
 type StepErrors = Partial<Record<keyof TestRunFormState, string>>
 
 export function validateTestRunStep(
@@ -181,6 +200,8 @@ export function validateTestRunStep(
       if (!state.email.trim()) errors.email = 'Enter your school email.'
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) {
         errors.email = 'Enter a valid email address.'
+      } else if (!isEduPhEmail(state.email)) {
+        errors.email = p[3].emailSchoolError
       }
       break
     }

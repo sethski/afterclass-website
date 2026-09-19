@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   formatHour,
-  formatSlotWindow,
   isDateSelectable,
   monthGrid,
   monthLabel,
   monthsInWindow,
   scheduleWindow,
+  SCHEDULE_SLOT_DURATION,
   toDateKey,
   validStartHoursForDate,
   type MonthCursor,
@@ -37,7 +37,6 @@ export function ScheduleCalendar({
 
   type Draft = {
     date: string
-    duration?: 2 | 3
     startHour?: number
   }
 
@@ -46,7 +45,6 @@ export function ScheduleCalendar({
     if (!first) return null
     return {
       date: first.date,
-      duration: first.duration,
       startHour: first.startHour,
     }
   })
@@ -58,11 +56,9 @@ export function ScheduleCalendar({
   }, [slots])
 
   const activeDate = draft?.date ?? null
-  const durationPicked = draft?.duration != null
-  const starts =
-    draft?.date && draft.duration != null
-      ? validStartHoursForDate(draft.date, draft.duration, now)
-      : []
+  const starts = draft?.date
+    ? validStartHoursForDate(draft.date, SCHEDULE_SLOT_DURATION, now)
+    : []
 
   const canPrev = monthIndex > 0
   const canNext = monthIndex < months.length - 1
@@ -104,13 +100,9 @@ export function ScheduleCalendar({
     function onWheel(event: WheelEvent) {
       const absX = Math.abs(event.deltaX)
       const absY = Math.abs(event.deltaY)
-      if (absX < 6 && absY < 6) return
+      if (absX < 6 || absX < absY) return
       event.preventDefault()
-      if (absX >= absY) {
-        stepMonth(event.deltaX > 0 ? 1 : -1)
-      } else {
-        stepMonth(event.deltaY > 0 ? 1 : -1)
-      }
+      stepMonth(event.deltaX > 0 ? 1 : -1)
     }
 
     el.addEventListener('wheel', onWheel, { passive: false })
@@ -130,16 +122,11 @@ export function ScheduleCalendar({
     const touch = event.changedTouches[0]
     if (!touch) return
     const dx = touch.clientX - start.x
-    const dy = touch.clientY - start.y
     const absX = Math.abs(dx)
-    const absY = Math.abs(dy)
+    const absY = Math.abs(touch.clientY - start.y)
     if (Math.max(absX, absY) < 40) return
-    if (absX >= absY) {
-      // swipe left → next month
+    if (absX > absY) {
       stepMonth(dx < 0 ? 1 : -1)
-    } else {
-      // swipe up → next month
-      stepMonth(dy < 0 ? 1 : -1)
     }
   }
 
@@ -156,7 +143,6 @@ export function ScheduleCalendar({
         const existing = byDate.get(key)!
         setDraft({
           date: key,
-          duration: existing.duration,
           startHour: existing.startHour,
         })
       }
@@ -166,26 +152,14 @@ export function ScheduleCalendar({
     setDraft({ date: key })
   }
 
-  function pickDuration(hours: 2 | 3) {
-    if (!draft) return
-    const allowed = validStartHoursForDate(draft.date, hours, now)
-    if (allowed.length === 0) {
-      setDraft({ date: draft.date, duration: hours })
-      return
-    }
-    // Duration chosen → reveal starts; clear prior start so they tap one.
-    setDraft({ date: draft.date, duration: hours })
-    onChange(slots.filter((slot) => slot.date !== draft.date))
-  }
-
   function pickStart(hour: number) {
-    if (!draft?.duration) return
+    if (!draft) return
     const next: ScheduleSlot = {
       date: draft.date,
-      duration: draft.duration,
+      duration: SCHEDULE_SLOT_DURATION,
       startHour: hour,
     }
-    setDraft({ ...next })
+    setDraft({ date: next.date, startHour: next.startHour })
     commitSlot(next)
   }
 
@@ -196,8 +170,8 @@ export function ScheduleCalendar({
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
         className={[
-          'rounded-[8px] border-2 px-3 py-4',
-          months.length > 1 ? 'touch-none' : '',
+          'rounded-[8px] border-2 px-2 py-3 sm:px-3 sm:py-4',
+          months.length > 1 ? 'touch-pan-y' : '',
           invalid ? 'border-[var(--q-error)]' : 'border-[var(--q-track)]',
         ].join(' ')}
       >
@@ -213,7 +187,7 @@ export function ScheduleCalendar({
                 disabled={!canPrev}
                 onClick={() => goMonth(monthIndex - 1)}
                 className={[
-                  'grid h-8 w-8 place-items-center rounded-[6px] text-sm font-medium transition-colors',
+                  'grid h-11 w-11 place-items-center rounded-[6px] text-sm font-medium transition-colors',
                   canPrev
                     ? 'text-[var(--q-text)] hover:bg-[var(--q-choice-bg)]'
                     : 'cursor-not-allowed text-[var(--q-track)]',
@@ -227,7 +201,7 @@ export function ScheduleCalendar({
                 disabled={!canNext}
                 onClick={() => goMonth(monthIndex + 1)}
                 className={[
-                  'grid h-8 w-8 place-items-center rounded-[6px] text-sm font-medium transition-colors',
+                  'grid h-11 w-11 place-items-center rounded-[6px] text-sm font-medium transition-colors',
                   canNext
                     ? 'text-[var(--q-text)] hover:bg-[var(--q-choice-bg)]'
                     : 'cursor-not-allowed text-[var(--q-track)]',
@@ -239,7 +213,7 @@ export function ScheduleCalendar({
           ) : null}
         </div>
 
-        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs font-medium text-[var(--q-muted)]">
+        <div className="mb-2 grid grid-cols-7 gap-0 text-center text-xs font-medium text-[var(--q-muted)] sm:gap-1">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
             <span key={d}>{d}</span>
           ))}
@@ -279,67 +253,40 @@ export function ScheduleCalendar({
               month: 'short',
               day: 'numeric',
             })}
-            {draft.duration != null && draft.startHour != null
-              ? ` · ${formatSlotWindow({
-                  date: draft.date,
-                  duration: draft.duration,
-                  startHour: draft.startHour,
-                })}`
+            {draft.startHour != null
+              ? ` · ${formatHour(draft.startHour)} to ${formatHour(draft.startHour + SCHEDULE_SLOT_DURATION)}`
               : ''}
           </p>
 
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-[var(--q-muted)]">How long?</p>
-            <div className="flex gap-2">
-              {([2, 3] as const).map((hours) => (
+            <p className="text-sm text-[var(--q-muted)]">Starts at</p>
+            <div className="grid w-full grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+              {starts.map((hour) => (
                 <button
-                  key={hours}
+                  key={hour}
                   type="button"
-                  onClick={() => pickDuration(hours)}
+                  onClick={() => pickStart(hour)}
                   className={[
-                    'min-h-10 flex-1 rounded-[6px] border-2 px-3 text-sm font-medium transition-colors',
-                    draft.duration === hours
+                    'min-h-11 w-full rounded-[6px] border-2 px-3 text-sm font-medium transition-colors',
+                    draft.startHour === hour
                       ? 'border-[var(--q-text)] bg-[var(--q-text)] text-[var(--q-bg)]'
                       : 'border-[var(--q-track)] text-[var(--q-text)]',
                   ].join(' ')}
                 >
-                  {hours} hours
+                  {`${formatHour(hour)} to ${formatHour(hour + SCHEDULE_SLOT_DURATION)}`}
                 </button>
               ))}
             </div>
+            {starts.length === 0 ? (
+              <p className="text-sm text-[var(--q-muted)]">
+                No daytime windows left today. Pick another day.
+              </p>
+            ) : null}
           </div>
-
-          {durationPicked ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-[var(--q-muted)]">Starts at</p>
-              <div className="flex flex-wrap gap-2">
-                {starts.map((hour) => (
-                  <button
-                    key={hour}
-                    type="button"
-                    onClick={() => pickStart(hour)}
-                    className={[
-                      'min-h-10 rounded-[6px] border-2 px-3 text-sm font-medium transition-colors',
-                      draft.startHour === hour
-                        ? 'border-[var(--q-text)] bg-[var(--q-text)] text-[var(--q-bg)]'
-                        : 'border-[var(--q-track)] text-[var(--q-text)]',
-                    ].join(' ')}
-                  >
-                    {formatHour(hour)}
-                  </button>
-                ))}
-              </div>
-              {starts.length === 0 ? (
-                <p className="text-sm text-[var(--q-muted)]">
-                  No daytime windows left today. Pick another day.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       ) : (
         <p className="text-sm text-[var(--q-muted)]">
-          Tap a day, pick how long, then a start time.
+          Tap a day, then a start time.
         </p>
       )}
     </div>
@@ -367,10 +314,10 @@ function MonthPanel({
     <div className="min-w-full shrink-0 snap-start">
       <div className="flex flex-col gap-1">
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 gap-1">
+          <div key={wi} className="grid grid-cols-7 gap-0 sm:gap-1">
             {week.map((day, di) => {
               if (!day) {
-                return <span key={`e-${wi}-${di}`} className="h-10" />
+                return <span key={`e-${wi}-${di}`} className="min-h-11" />
               }
               const key = toDateKey(day)
               const selectable = isDateSelectable(key, window)
@@ -383,7 +330,7 @@ function MonthPanel({
                   disabled={!selectable}
                   onClick={() => onToggle(day)}
                   className={[
-                    'grid h-10 place-items-center rounded-[6px] text-sm font-medium transition-colors',
+                    'grid min-h-11 w-full place-items-center rounded-[6px] text-sm font-medium transition-colors',
                     !selectable
                       ? 'cursor-not-allowed text-[var(--q-track)]'
                       : selected

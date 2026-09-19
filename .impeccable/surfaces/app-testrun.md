@@ -1,15 +1,15 @@
 ---
 version: 1
 slug: "app-testrun"
-primary_target: "app/TestRun"
+primary_target: "app/enlistment"
 related_targets: []
 ---
 
-# Surface: /TestRun
+# Surface: /enlistment
 
 Visitor mode: Operate (signup task) with Persuade cover and ending fields.
 
-Audience: Metro Manila college students, 18+ only. Job: join a founder-run cafe dry run. Action: complete nine pages, then wait to be messaged. Constraints: pinned copy keys, Open Sauce Two (medium questions, bold OK), temporary AC placeholder mark, no waitlist domain. Palette is pure black/white Typeform stub (recolor later via `.test-run` `--q-*` vars).
+Audience: Metro Manila college students, 18+ only. Job: join a founder-run cafe dry run. Action: complete the step stack, then wait to be messaged. Constraints: pinned copy keys, Open Sauce Two (medium questions, bold OK), temporary AC placeholder mark, no waitlist domain. Palette is pure black/white Typeform stub (recolor later via `.test-run` `--q-*` vars). Legacy `/TestRun` aliases redirect here.
 
 ## Direction contract
 

@@ -24,21 +24,27 @@ import { testRunContent as copy } from '@/lib/test-run-content'
 import { serializeScheduleSlots } from '@/lib/test-run-schedule'
 import {
   emptyTestRunState,
-  looksLikePersonalInbox,
   validateTestRunPage,
   type TestRunFormState,
 } from '@/lib/validations/test-run'
 import {
+  isTestRunStepScreen,
   nextStep,
   prevStep,
   stepBadgeNumber,
   stepCount,
   stepIndex,
   validateTestRunStep,
+  type TestRunScreen,
   type TestRunStepId,
 } from '@/lib/test-run-steps'
-
-type Screen = 'welcome' | TestRunStepId | 'ending-ok' | 'ending-no' | 'ending-age' | 'ending-graduated'
+import {
+  readTestRunDraft,
+  readTestRunDraftFiles,
+  restoreScreen,
+  writeTestRunDraft,
+  writeTestRunDraftFiles,
+} from '@/lib/test-run-draft'
 
 interface TestRunFormProps {
   prefillEmail?: string
@@ -47,7 +53,8 @@ interface TestRunFormProps {
 
 export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
   const reduceMotion = useReducedMotion()
-  const [screen, setScreen] = useState<Screen>('welcome')
+  const [ready, setReady] = useState(false)
+  const [screen, setScreen] = useState<TestRunScreen>('welcome')
   const [direction, setDirection] = useState(1)
   const [values, setValues] = useState<TestRunFormState>(() =>
     emptyTestRunState({ email: prefillEmail, howHeard })
@@ -56,28 +63,9 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
   const [pending, setPending] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
-  const isStep = (s: Screen): s is TestRunStepId =>
-    s !== 'welcome' &&
-    s !== 'ending-ok' &&
-    s !== 'ending-no' &&
-    s !== 'ending-age' &&
-    s !== 'ending-graduated'
-
-  const emailWarn =
-    screen === 'email' && values.email && looksLikePersonalInbox(values.email)
-      ? copy.pages[3].emailWarn
-      : null
-
   const progressWidth = useMemo(() => {
     if (screen === 'welcome') return 0
-    if (
-      screen === 'ending-ok' ||
-      screen === 'ending-no' ||
-      screen === 'ending-age' ||
-      screen === 'ending-graduated'
-    ) {
-      return 100
-    }
+    if (!isTestRunStepScreen(screen)) return 100
     const total = stepCount(values)
     const index = stepIndex(screen, values)
     if (total <= 0 || index < 0) return 0
@@ -92,7 +80,7 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
     }))
   }
 
-  function go(next: Screen, dir = 1) {
+  function go(next: TestRunScreen, dir = 1) {
     setDirection(dir)
     setErrors({})
     setSubmitError('')
@@ -230,7 +218,6 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
     if (values.facePhoto) formData.set('facePhoto', values.facePhoto)
     if (values.schoolIdPhoto) formData.set('schoolIdPhoto', values.schoolIdPhoto)
 
-    // Preview: still show the success ending if the backend isn't ready yet.
     try {
       const result = await submitTestRun(formData)
       setPending(false)
@@ -242,11 +229,50 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
         go('ending-no')
         return
       }
+      if (!result.ok) {
+        setSubmitError(result.message)
+        return
+      }
     } catch {
       setPending(false)
+      setSubmitError('Could not send your signup. Try again.')
+      return
     }
     go('ending-ok')
   }
+
+  useEffect(() => {
+    let cancelled = false
+    async function hydrate() {
+      const draft = readTestRunDraft({ email: prefillEmail, howHeard })
+      const files = await readTestRunDraftFiles()
+      if (cancelled) return
+      if (draft) {
+        const merged: TestRunFormState = {
+          ...draft.values,
+          facePhoto: files.facePhoto,
+          schoolIdPhoto: files.schoolIdPhoto,
+        }
+        setValues(merged)
+        setScreen(restoreScreen(draft.screen, merged))
+      }
+      setReady(true)
+    }
+    void hydrate()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ready) return
+    writeTestRunDraft(screen, values)
+  }, [ready, screen, values])
+
+  useEffect(() => {
+    if (!ready) return
+    void writeTestRunDraftFiles(values.facePhoto, values.schoolIdPhoto)
+  }, [ready, values.facePhoto, values.schoolIdPhoto])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
@@ -254,7 +280,7 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (pending) return
+      if (!ready || pending) return
       const target = event.target as HTMLElement | null
       const isMetaEnter =
         (event.metaKey || event.ctrlKey) && event.key === 'Enter'
@@ -270,7 +296,7 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
         go('intro')
         return
       }
-      if (isStep(screen)) {
+      if (isTestRunStepScreen(screen)) {
         event.preventDefault()
         continueFromStep(screen)
       }
@@ -279,28 +305,24 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  const slide = useMemo(() => {
-    if (reduceMotion) {
-      return {
-        initial: { opacity: 0 },
-        animate: { opacity: 1 },
-        exit: { opacity: 0 },
-      }
-    }
-    return {
-      initial: { opacity: 0, y: direction * 36 },
-      animate: { opacity: 1, y: 0 },
-      exit: { opacity: 0, y: direction * -36 },
-    }
-  }, [direction, reduceMotion])
+  const slideVariants = useMemo(
+    () => ({
+      enter: (dir: number) =>
+        reduceMotion ? { opacity: 0 } : { opacity: 0, y: dir * -36 },
+      center: { opacity: 1, y: 0 },
+      exit: (dir: number) =>
+        reduceMotion ? { opacity: 0 } : { opacity: 0, y: dir * 36 },
+    }),
+    [reduceMotion]
+  )
 
   const continueLabel =
-    isStep(screen) && nextStep(screen, values) === 'submit'
+    isTestRunStepScreen(screen) && nextStep(screen, values) === 'submit'
       ? copy.submit
       : copy.continue
 
   return (
-    <div className="test-run relative min-h-[100dvh] overflow-x-hidden text-[var(--q-text)]">
+    <div className="test-run relative h-[100dvh] max-h-[100dvh] overflow-hidden text-[var(--q-text)]">
       <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
         <Image
           src="/brand/test-run-backdrop.png"
@@ -314,8 +336,13 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
       </div>
 
       <div
-        className="pointer-events-none fixed inset-x-0 top-0 z-40 bg-[var(--q-track)]"
-        style={{ height: 'var(--q-progress-h)' }}
+        className="pointer-events-none fixed z-40 bg-[var(--q-track)]"
+        style={{
+          top: 'env(safe-area-inset-top, 0px)',
+          left: 'env(safe-area-inset-left, 0px)',
+          right: 'env(safe-area-inset-right, 0px)',
+          height: 'var(--q-progress-h)',
+        }}
       >
         <div
           key={String(screen)}
@@ -329,19 +356,29 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
         />
       </div>
 
-      <div className="relative z-10 flex min-h-[100dvh] w-full flex-col pt-[var(--q-image-peek)]">
-        <div className="relative flex min-h-[calc(100dvh-var(--q-image-peek))] flex-1 flex-col overflow-hidden bg-[var(--q-bg)] shadow-[0_-12px_40px_rgb(0_0_0/0.18)]">
+      <div className="relative z-10 flex h-full min-h-0 w-full min-w-0 flex-col pt-[var(--q-image-peek)]">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[var(--q-bg)] shadow-[0_-12px_40px_rgb(0_0_0/0.18)]">
+          {!ready ? (
+            <div className="relative flex w-full flex-1 flex-col" />
+          ) : (
           <AnimatePresence mode="wait" initial={false} custom={direction}>
             <motion.div
               key={String(screen)}
-              initial={slide.initial}
-              animate={slide.animate}
-              exit={slide.exit}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
               transition={{
                 duration: reduceMotion ? 0.01 : 0.34,
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className="relative flex w-full flex-1 flex-col"
+              className="relative flex w-full min-w-0 shrink-0 flex-col"
+              style={{
+                minHeight: isTestRunStepScreen(screen)
+                  ? 'calc(100% - var(--q-nav-reserve))'
+                  : '100%',
+              }}
             >
               {screen === 'welcome' ? (
                 <Cover
@@ -375,7 +412,7 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
                   sub={copy.endings.graduated.body}
                 />
               ) : null}
-              {isStep(screen) ? (
+              {isTestRunStepScreen(screen) ? (
                 <FormShell
                   stepNumber={stepBadgeNumber(screen, values)}
                   onContinue={() => continueFromStep(screen)}
@@ -387,7 +424,6 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
                     step={screen}
                     values={values}
                     errors={errors}
-                    emailWarn={emailWarn}
                     patch={patch}
                     onContinue={() => continueFromStep(screen)}
                   />
@@ -395,15 +431,30 @@ export function TestRunForm({ prefillEmail, howHeard }: TestRunFormProps) {
               ) : null}
             </motion.div>
           </AnimatePresence>
+          )}
+          <div
+            aria-hidden
+            className="pointer-events-none shrink-0"
+            style={{
+              height:
+                ready && isTestRunStepScreen(screen)
+                  ? 'var(--q-nav-reserve)'
+                  : 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
+            }}
+          />
         </div>
       </div>
 
-      {isStep(screen) ? (
+      {ready && isTestRunStepScreen(screen) ? (
         <div
-          className="fixed z-30 flex items-center gap-1.5"
+          className="fixed z-30 flex items-center justify-end gap-1.5 border-t border-[var(--q-track)] bg-[var(--q-bg)]"
           style={{
-            right: 'var(--q-footer-inset)',
-            bottom: 'calc(24px + env(safe-area-inset-bottom))',
+            left: 'env(safe-area-inset-left, 0px)',
+            right: 0,
+            bottom: 0,
+            paddingTop: '8px',
+            paddingRight: 'var(--q-footer-inset)',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
           }}
         >
           <button
@@ -459,7 +510,7 @@ function Cover({
   onStart?: () => void
 }) {
   return (
-    <section className="relative flex w-full min-w-0 flex-1 flex-col px-6 py-16 text-[var(--q-text)] md:px-10 md:py-24">
+    <section className="relative flex w-full min-w-0 flex-1 flex-col px-4 py-10 text-[var(--q-text)] sm:px-6 md:px-10 md:py-24">
       <div className="mx-auto flex w-full max-w-[var(--q-col-max)] flex-1 flex-col items-center justify-center text-center">
         <h1 className="font-open-sauce w-full min-w-0 text-[length:var(--q-title)] font-medium leading-snug tracking-tight">
           {headline}
@@ -483,7 +534,7 @@ function Cover({
             >
               {action ?? copy.start}
             </button>
-            <p className="text-base font-normal text-[var(--q-muted)]">
+            <p className="q-enter-hint text-base font-normal text-[var(--q-muted)]">
               {copy.enterHint}
             </p>
           </div>
@@ -510,7 +561,7 @@ function FormShell({
 }) {
   const isSubmit = continueLabel === copy.submit
   return (
-    <div className="relative mx-auto flex w-full max-w-[var(--q-col-max)] flex-1 flex-col justify-center px-6 py-16 md:px-10 md:py-24">
+    <div className="relative mx-auto flex w-full min-w-0 max-w-[var(--q-col-max)] flex-1 flex-col justify-center px-4 py-8 sm:px-6 md:px-10 md:py-24">
       <div className="flex w-full flex-col gap-8">
         {children}
         {submitError ? (
@@ -530,7 +581,7 @@ function FormShell({
           >
             {pending ? copy.submitting : continueLabel}
           </button>
-          <p className="text-base font-normal text-[var(--q-muted)]">
+          <p className="q-enter-hint text-base font-normal text-[var(--q-muted)]">
             {isSubmit ? 'press Cmd + Enter' : copy.enterHint}
           </p>
         </div>
@@ -544,14 +595,12 @@ function StepBody({
   step,
   values,
   errors,
-  emailWarn,
   patch,
   onContinue,
 }: {
   step: TestRunStepId
   values: TestRunFormState
   errors: ReturnType<typeof validateTestRunStep>
-  emailWarn: string | null
   patch: (next: Partial<TestRunFormState>) => void
   onContinue: () => void
 }) {
@@ -662,7 +711,7 @@ function StepBody({
         <Question
           title={p[3].email}
           htmlFor="email"
-          helper={emailWarn ?? p[3].emailHelper}
+          helper={p[3].emailHelper}
           error={errors.email} number={n}>
           <TextInput
             id="email"

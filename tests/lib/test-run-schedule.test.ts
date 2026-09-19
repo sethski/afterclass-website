@@ -10,28 +10,30 @@ import {
 } from '@/lib/test-run-schedule'
 
 describe('test-run-schedule', () => {
-  it('limits start hours so windows end by 6pm', () => {
-    expect(validStartHours(2)).toEqual([9, 10, 11, 12, 13, 14, 15, 16])
-    expect(validStartHours(3)).toEqual([9, 10, 11, 12, 13, 14, 15])
+  it('limits start hours so 2-hour windows end by 6pm', () => {
+    expect(validStartHours(2)).toEqual([9, 11, 14, 16])
   })
 
   it('requires at least one complete slot', () => {
     expect(scheduleSlotsValid([])).toBe(false)
     expect(
-      scheduleSlotsValid([{ date: '2026-09-22', startHour: 13, duration: 2 }])
+      scheduleSlotsValid([{ date: '2026-09-22', startHour: 14, duration: 2 }])
     ).toBe(true)
     expect(
       scheduleSlotsValid([{ date: '2026-09-22', startHour: 17, duration: 2 }])
+    ).toBe(false)
+    expect(
+      scheduleSlotsValid([{ date: '2026-09-22', startHour: 14, duration: 3 }])
     ).toBe(false)
   })
 
   it('serializes slots into a readable schedule string', () => {
     const text = serializeScheduleSlots([
-      { date: '2026-09-24', startHour: 14, duration: 3 },
-      { date: '2026-09-22', startHour: 13, duration: 2 },
+      { date: '2026-09-24', startHour: 16, duration: 2 },
+      { date: '2026-09-22', startHour: 14, duration: 2 },
     ])
-    expect(text).toContain('1:00 PM–3:00 PM (2h)')
-    expect(text).toContain('2:00 PM–5:00 PM (3h)')
+    expect(text).toContain('2:00 PM–4:00 PM (2h)')
+    expect(text).toContain('4:00 PM–6:00 PM (2h)')
     expect(text.indexOf('Sep 22')).toBeLessThan(text.indexOf('Sep 24'))
   })
 
@@ -63,11 +65,7 @@ describe('test-run-schedule', () => {
   it('filters today start hours that already passed in Manila', () => {
     // 2026-09-19 04:30 UTC = 2026-09-19 12:30 Asia/Manila
     const from = new Date('2026-09-19T04:30:00.000Z')
-    expect(validStartHoursForDate('2026-09-19', 2, from)).toEqual([
-      13, 14, 15, 16,
-    ])
-    expect(validStartHoursForDate('2026-09-20', 2, from)).toEqual([
-      9, 10, 11, 12, 13, 14, 15, 16,
-    ])
+    expect(validStartHoursForDate('2026-09-19', 2, from)).toEqual([14, 16])
+    expect(validStartHoursForDate('2026-09-20', 2, from)).toEqual([9, 11, 14, 16])
   })
 })

@@ -131,9 +131,10 @@ body {
   --q-badge: 32px;
   --q-badge-radius: 4px;
   --q-col-max: 50rem;
-  --q-chevron: 36px;
-  --q-footer-inset: 24px;
-  --q-image-peek: clamp(4.5rem, 14vw, 8.5rem);
+  --q-chevron: 44px;
+  --q-footer-inset: max(16px, env(safe-area-inset-right, 0px));
+  --q-image-peek: clamp(2.75rem, 8dvh, 8.5rem);
+  --q-nav-reserve: calc(var(--q-chevron) + 48px + env(safe-area-inset-bottom, 0px));
   --q-title: clamp(1.625rem, 2.8vw, 2rem);
   --q-body: 1.125rem;
   --q-key: 28px;
@@ -142,6 +143,8 @@ body {
   color: var(--q-text);
   caret-color: var(--q-text);
   scrollbar-color: var(--q-muted) var(--q-bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .test-run ::selection {
@@ -180,4 +183,10 @@ body {
 .test-run textarea[aria-invalid='true'],
 .test-run select[aria-invalid='true'] {
   border-color: var(--q-error) !important;
+}
+
+@media (pointer: coarse) {
+  .test-run .q-enter-hint {
+    display: none;
+  }
 }

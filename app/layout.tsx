@@ -1,6 +1,11 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { snPro, openSauceTwo } from './fonts'
 import './globals.css'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -31,7 +36,9 @@ export default function RootLayout({
       lang="en"
       className={`${snPro.variable} ${openSauceTwo.variable}`}
     >
-      <body className="antialiased">{children}</body>
+      <body className="antialiased" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   )
 }

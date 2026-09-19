@@ -1,5 +1,5 @@
 export const testRunContent = {
-  metaTitle: 'After Class Test Form',
+  metaTitle: 'After Class Enlistment',
   metaDescription:
     'We match you, pick a midpoint cafe, set the date. You show up.',
   brand: 'After Class',
@@ -46,9 +46,8 @@ export const testRunContent = {
       age: 'What\'s your age?',
       ageHelper: 'Must be 18 or above',
       email: 'What\'s your email?',
-      emailHelper: 'We encourage you to use your school email.',
-      emailWarn:
-        'That looks like a personal inbox. A school domain is easier to verify. You can still continue.',
+      emailHelper: 'Use your .edu.ph school email.',
+      emailSchoolError: 'Please type your school email.',
       phone: 'Phone',
       phoneHelper: '',
       socials: 'What\'s your Instagram/Messenger?',
@@ -103,7 +102,7 @@ export const testRunContent = {
       title: 'Schedule',
       when: 'What date and time are you available?',
       whenHelper:
-        'Pick any days in the next month or so. For each day, choose a 2 or 3 hour block that works for you.',
+        'Pick any days in the next month or so. For each day, pick a 2 hour window.',
       hardNos: 'Hard nos',
       hardNosHelper: 'Exams, work, etc.',
     },

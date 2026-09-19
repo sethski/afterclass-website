@@ -2,15 +2,22 @@
   "name": "afterclass-website",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
+    "dev:admin": "npm run dev -w @afterclass/admin",
     "build": "next build",
+    "build:admin": "npm run build -w @afterclass/admin",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@afterclass/db": "*",
     "@fontsource/open-sauce-two": "^5.3.0",
     "@fontsource/sn-pro": "^5.3.0",
     "@supabase/supabase-js": "^2.112.1",

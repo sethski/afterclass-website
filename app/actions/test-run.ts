@@ -2,7 +2,7 @@
 
 import { createHmac, randomUUID } from 'crypto'
 import { headers } from 'next/headers'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createTestRunClient } from '@/lib/supabase/server'
 import {
   isAllowedTestRunFile,
   looksLikePersonalInbox,
@@ -156,7 +156,7 @@ export async function submitTestRun(
   const schoolIdPath = `${id}/school-id.${fileExtension(schoolId)}`
 
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = createTestRunClient()
     const rateSecret = process.env.RATE_LIMIT_HMAC_SECRET
     if (rateSecret) {
       const headerStore = await headers()

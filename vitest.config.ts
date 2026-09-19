@@ -9,6 +9,9 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
   },
   resolve: {
-    alias: { '@': path.resolve(__dirname, '.') },
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+      '@afterclass/db': path.resolve(__dirname, 'packages/db/src/index.ts'),
+    },
   },
 })

@@ -40,6 +40,12 @@ export function looksLikePersonalInbox(email: string): boolean {
   return PERSONAL_INBOX_DOMAINS.has(domain)
 }
 
+export function isEduPhEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.trim().toLowerCase()
+  if (!domain) return false
+  return domain.endsWith('.edu.ph')
+}
+
 const nonEmpty = (message: string) => z.string().trim().min(1, message)
 
 export const testRunPayloadSchema = z
@@ -55,7 +61,11 @@ export const testRunPayloadSchema = z
       .int('Enter your age as a whole number.')
       .min(18, 'Early testing is 18+ only.')
       .max(99, 'Enter a real age.'),
-    email: z.email('Enter a valid email address'),
+    email: z
+      .email('Enter a valid email address')
+      .refine((value) => isEduPhEmail(value), {
+        error: testRunContent.pages[3].emailSchoolError,
+      }),
     phone: z.string().trim().optional().default(''),
     socials: nonEmpty('Enter your Instagram handle.'),
     contactPreference: z
@@ -324,6 +334,9 @@ export function validateTestRunPage(
     else {
       const parsed = z.email().safeParse(state.email.trim())
       if (!parsed.success) errors.email = 'Enter a valid email address.'
+      else if (!isEduPhEmail(state.email)) {
+        errors.email = p[3].emailSchoolError
+      }
     }
     if (!state.socials.trim()) errors.socials = 'Enter your Instagram handle.'
   }

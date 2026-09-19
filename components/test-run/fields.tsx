@@ -250,7 +250,7 @@ export function SchoolSelect({
 
 export function ChoiceRow({ children }: { children: ReactNode }) {
   return (
-    <div className="flex w-max min-w-[16rem] max-w-full flex-col gap-3">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-3">
       {children}
     </div>
   )
@@ -580,7 +580,8 @@ export function FilePick({
 }) {
   const [preview, setPreview] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const libraryRef = useRef<HTMLInputElement | null>(null)
+  const cameraRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!file) {
@@ -607,18 +608,12 @@ export function FilePick({
     if (next) takeFile(next)
   }
 
+  const accept =
+    'image/*,image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif'
+
   return (
     <div className="flex flex-col gap-2">
       <div
-        role="button"
-        tabIndex={0}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            inputRef.current?.click()
-          }
-        }}
-        onClick={() => inputRef.current?.click()}
         onDragEnter={(event) => {
           event.preventDefault()
           setDragging(true)
@@ -633,7 +628,7 @@ export function FilePick({
         }}
         onDrop={handleDrop}
         className={[
-          'flex min-h-[14rem] w-full cursor-pointer flex-col items-center justify-center gap-4 rounded-[8px] border-2 border-dashed px-6 py-10 text-center transition-colors',
+          'flex min-h-[14rem] w-full min-w-0 flex-col items-center justify-center gap-4 rounded-[8px] border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-6 sm:py-10',
           dragging
             ? 'border-[var(--q-text)] bg-[var(--q-choice-bg)]'
             : 'border-[var(--q-track)] bg-transparent hover:border-[var(--q-muted)]',
@@ -675,19 +670,37 @@ export function FilePick({
           </span>
         )}
 
-        <div className="flex flex-col items-center gap-3">
-          <p className="font-open-sauce text-[length:var(--q-body)] font-normal text-[var(--q-text)]">
-            {file ? file.name : 'Drop to upload your photo or'}
-          </p>
-          <span
-            className="inline-flex items-center justify-center rounded-[4px] border border-[var(--q-track)] bg-[var(--q-choice-bg)] px-4 py-2 font-open-sauce text-sm font-medium text-[var(--q-text)]"
-            onClick={(event) => {
-              event.stopPropagation()
-              inputRef.current?.click()
-            }}
-          >
-            {file ? 'Replace photo' : label || 'Choose file'}
-          </span>
+        <div className="flex w-full min-w-0 flex-col items-center gap-3">
+          {file ? (
+            <p className="max-w-full truncate font-open-sauce text-[length:var(--q-body)] font-normal text-[var(--q-text)]">
+              {file.name}
+            </p>
+          ) : (
+            <>
+              <p className="font-open-sauce text-[length:var(--q-body)] font-normal text-[var(--q-text)] [@media(pointer:coarse)]:hidden">
+                Drop to upload your photo or
+              </p>
+              <p className="hidden font-open-sauce text-[length:var(--q-body)] font-normal text-[var(--q-text)] [@media(pointer:coarse)]:block">
+                Take a photo or choose a file
+              </p>
+            </>
+          )}
+          <div className="flex w-full max-w-xs flex-col gap-2 sm:max-w-none sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center justify-center rounded-[4px] border border-[var(--q-track)] bg-[var(--q-choice-bg)] px-4 font-open-sauce text-base font-medium text-[var(--q-text)]"
+              onClick={() => cameraRef.current?.click()}
+            >
+              Take photo
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center justify-center rounded-[4px] border border-[var(--q-track)] bg-[var(--q-choice-bg)] px-4 font-open-sauce text-base font-medium text-[var(--q-text)]"
+              onClick={() => libraryRef.current?.click()}
+            >
+              {file ? 'Replace photo' : label || 'Choose file'}
+            </button>
+          </div>
           {!file ? (
             <p className="text-sm text-[var(--q-muted)]">
               JPG, PNG, WEBP, or HEIC. 5 MB max.
@@ -696,10 +709,18 @@ export function FilePick({
         </div>
 
         <input
-          ref={inputRef}
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          className="sr-only"
+          onChange={handleChange}
+        />
+        <input
+          ref={libraryRef}
           id={id}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+          accept={accept}
           className="sr-only"
           onChange={handleChange}
         />

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   emptyTestRunState,
+  isEduPhEmail,
   looksLikePersonalInbox,
   toTestRunPayload,
   testRunPayloadSchema,
@@ -24,6 +25,43 @@ describe('looksLikePersonalInbox', () => {
   })
 })
 
+describe('isEduPhEmail', () => {
+  it('accepts .edu.ph domains', () => {
+    expect(isEduPhEmail('ada@upd.edu.ph')).toBe(true)
+    expect(isEduPhEmail('ADA@DLSU.EDU.PH')).toBe(true)
+    expect(isEduPhEmail('ada@student.ust.edu.ph')).toBe(true)
+  })
+
+  it('rejects personal and non-.edu.ph school domains', () => {
+    expect(isEduPhEmail('ada@gmail.com')).toBe(false)
+    expect(isEduPhEmail('ada@ateneo.edu')).toBe(false)
+    expect(isEduPhEmail('')).toBe(false)
+  })
+})
+
+describe('email step', () => {
+  it('is badge 7 on the default path', () => {
+    expect(stepBadgeNumber('email', emptyTestRunState())).toBe(7)
+  })
+
+  it('blocks non-.edu.ph addresses', () => {
+    const state = emptyTestRunState()
+    state.email = 'ada@gmail.com'
+    expect(validateTestRunStep('email', state).email).toMatch(/school email/i)
+    expect(validateTestRunPage(3, state).email).toMatch(/school email/i)
+    state.email = 'ada@upd.edu.ph'
+    expect(validateTestRunStep('email', state)).toEqual({})
+  })
+
+  it('rejects non-.edu.ph payloads', () => {
+    const state = completeState()
+    state.email = 'ada@gmail.com'
+    expect(testRunPayloadSchema.safeParse(toTestRunPayload(state)).success).toBe(
+      false
+    )
+  })
+})
+
 describe('validateTestRunPage', () => {
   it('sends no on page 1 to the decline path without other errors besides choice', () => {
     const state = emptyTestRunState()
@@ -36,7 +74,7 @@ describe('validateTestRunPage', () => {
     const state = emptyTestRunState()
     state.fullName = 'Ada Reyes'
     state.age = '17'
-    state.email = 'ada@ateneo.edu'
+    state.email = 'ada@upd.edu.ph'
     state.socials = '@ada.reyes'
     state.contactPreference = 'Instagram'
     expect(validateTestRunPage(3, state).age).toMatch(/18/)
@@ -143,7 +181,7 @@ describe('everythingTrue step', () => {
 
 function completeState() {
   const state = emptyTestRunState({
-    email: 'ada@ateneo.edu',
+    email: 'ada@upd.edu.ph',
     howHeard: 'friend',
   })
   state.consent = true
@@ -151,7 +189,7 @@ function completeState() {
   state.cityCorridor = 'Quezon City'
   state.fullName = 'Ada Reyes'
   state.age = '20'
-  state.email = 'ada@ateneo.edu'
+  state.email = 'ada@upd.edu.ph'
   state.socials = '@ada.reyes'
   state.contactPreference = 'Instagram'
   state.isMe = true
@@ -165,8 +203,8 @@ function completeState() {
   state.aboutYou = 'Walk first, then coffee. I show up on time.'
   state.coverOwnOrder = 'yes'
   state.scheduleSlots = [
-    { date: '2026-09-22', startHour: 13, duration: 2 },
-    { date: '2026-09-24', startHour: 14, duration: 3 },
+    { date: '2026-09-22', startHour: 14, duration: 2 },
+    { date: '2026-09-24', startHour: 16, duration: 2 },
   ]
   state.understandEarly = true
   state.publicCafe = true
